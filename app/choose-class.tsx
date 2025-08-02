@@ -1,37 +1,47 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from '../components/SafeAreaView';
 import { ChevronLeft } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-
-const classOptions = [
-  { id: 'all', name: 'All tasks', isSelected: true },
-  { id: 'maths', name: 'Maths', isSelected: false },
-  { id: 'memory', name: 'Memory', isSelected: false },
-  { id: 'word', name: 'Word', isSelected: false },
-  { id: 'facts', name: 'Facts', isSelected: false },
-];
+import { useApp } from '../contexts/AppContext';
 
 export default function ChooseClassScreen() {
   const router = useRouter();
-  const [selectedClass, setSelectedClass] = useState('all');
+  const { classes, selectedClassId, setClass } = useApp();
+  const [tempSelectedClass, setTempSelectedClass] = useState('');
 
-  const handleBackPress = () => {
+  // Find the mixed level class (the one with multiple tags)
+  const mixedLevelClass = classes.find(cls => 
+    cls.tags && cls.tags.length > 1
+  );
+
+  // Get individual classes (those with single tags)
+  const individualClasses = classes.filter(cls => 
+    cls.tags && cls.tags.length === 1
+  );
+
+  // Map the current selected class ID to display name
+  const getCurrentDisplayClass = () => {
+    if (selectedClassId === mixedLevelClass?.id) return mixedLevelClass?.id;
+    return selectedClassId || mixedLevelClass?.id || '';
+  };
+
+  const handleBackPress = async () => {
+    await setClass(tempSelectedClass);
     router.back();
   };
 
   const handleClassSelect = (classId: string) => {
-    setSelectedClass(classId);
+    setTempSelectedClass(classId);
   };
+
+  // Initialize temp selection based on current selection
+  React.useEffect(() => {
+    setTempSelectedClass(getCurrentDisplayClass());
+  }, []);
 
   return (
     <View style={styles.screenContainer}>
-      <StatusBar
-        style="light"
-        backgroundColor="transparent"
-        translucent={true}
-      />
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -45,58 +55,44 @@ export default function ChooseClassScreen() {
         {/* Content */}
         <View style={styles.content}>
           {/* All Tasks Section */}
-          <View style={styles.section}>
-            <TouchableOpacity 
-              style={[
-                styles.allTasksCard,
-                selectedClass === 'all' && styles.selectedCard
-              ]}
-              onPress={() => handleClassSelect('all')}
-              activeOpacity={0.8}
-            >
-              <View style={styles.allTasksContent}>
-                <Text style={styles.allTasksText}>All tasks</Text>
-                <View style={styles.subButtonsGrid}>
-                  <View style={[
-                    styles.subButton,
-                    selectedClass === 'all' && { backgroundColor: 'rgba(255, 255, 255, 0.8)' }
-                  ]}>
-                    <Text style={[styles.subButtonText, selectedClass === 'all' && { color: '#15131A' }]}>Maths</Text>
-                  </View>
-                  <View style={[
-                    styles.subButton,
-                    selectedClass === 'all' && { backgroundColor: 'rgba(255, 255, 255, 0.8)' }
-                  ]}>
-                    <Text style={[styles.subButtonText, selectedClass === 'all' && { color: '#15131A' }]}>Memory</Text>
-                  </View>
-                  <View style={[
-                    styles.subButton,
-                    selectedClass === 'all' && { backgroundColor: 'rgba(255, 255, 255, 0.8)' }
-                  ]}>
-                    <Text style={[styles.subButtonText, selectedClass === 'all' && { color: '#15131A' }]}>Word</Text>
-                  </View>
-                  <View style={[
-                    styles.subButton,
-                    selectedClass === 'all' && { backgroundColor: 'rgba(255, 255, 255, 0.8)' }
-                  ]}>
-                    <Text style={[styles.subButtonText, selectedClass === 'all' && { color: '#15131A' }]}>Facts</Text>
+          {mixedLevelClass && (
+            <View style={styles.section}>
+              <TouchableOpacity 
+                style={[
+                  styles.allTasksCard,
+                  tempSelectedClass === mixedLevelClass.id && styles.selectedCard
+                ]}
+                onPress={() => handleClassSelect(mixedLevelClass.id)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.allTasksContent}>
+                  <Text style={styles.allTasksText}>All tasks</Text>
+                  <View style={styles.subButtonsGrid}>
+                    {mixedLevelClass.tags?.map((tag, index) => (
+                      <View key={index} style={[
+                        styles.subButton,
+                        tempSelectedClass === mixedLevelClass.id && { backgroundColor: 'rgba(255, 255, 255, 0.8)' }
+                      ]}>
+                        <Text style={[styles.subButtonText, tempSelectedClass === mixedLevelClass.id && { color: '#15131A' }]}>{tag}</Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-          </View>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Instructional Text */}
           <Text style={styles.instructionText}>You can choose individual classes</Text>
 
           {/* Individual Classes Grid */}
           <View style={styles.individualClassesGrid}>
-            {classOptions.slice(1).map((classOption) => (
+            {individualClasses.map((classOption) => (
               <TouchableOpacity
                 key={classOption.id}
                 style={[
                   styles.individualClassCard,
-                  selectedClass === classOption.id && styles.selectedCard
+                  tempSelectedClass === classOption.id && styles.selectedCard
                 ]}
                 onPress={() => handleClassSelect(classOption.id)}
                 activeOpacity={0.8}
@@ -137,8 +133,8 @@ const styles = StyleSheet.create({
   },
   title: {
     color: 'white',
-    fontSize: 20,
-    fontWeight: '300',
+    fontSize: 18,
+    fontWeight: '400',
   },
   spacer: {
     width: 40,
@@ -156,7 +152,7 @@ const styles = StyleSheet.create({
   allTasksCard: {
     backgroundColor: 'rgba(121, 75, 214, 0.1)',
     borderRadius: 24,
-    padding: 20,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,

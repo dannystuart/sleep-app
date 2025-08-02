@@ -1,14 +1,45 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from '../../components/SafeAreaView';
 import { ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useApp } from '../../contexts/AppContext';
 
 const { width } = Dimensions.get('window');
 const maxWidth = Math.min(width, 400);
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { coaches, classes, selectedCoachId, selectedClassId, timerSeconds, isLoading } = useApp();
+
+  const selectedCoach = coaches.find(c => c.id === selectedCoachId);
+  const selectedClass = classes.find(c => c.id === selectedClassId);
+
+  // Get the display name and tags for the selected class
+  const getClassDisplayInfo = () => {
+    if (!selectedClass) {
+      return {
+        name: 'Select Class',
+        tags: []
+      };
+    }
+    
+    // Check if it's a mixed level class by tags
+    if (selectedClass.tags && selectedClass.tags.length > 1) {
+      return {
+        name: 'All Tasks',
+        tags: selectedClass.tags
+      };
+    }
+    
+    // For individual classes, use the actual name
+    return {
+      name: selectedClass.name || 'Select Class',
+      tags: selectedClass.tags || []
+    };
+  };
+
+  const classDisplayInfo = getClassDisplayInfo();
 
   const handleCoachPress = () => {
     router.push('/choose-coach');
@@ -21,6 +52,20 @@ export default function SettingsScreen() {
   const handleTimerPress = () => {
     router.push('/sleep-timer');
   };
+
+  if (isLoading) {
+    return (
+      <View style={styles.screenContainer}>
+        <SafeAreaView style={styles.container}>
+          <View style={[styles.mobileContainer, { maxWidth }]}>
+            <View style={styles.content}>
+              <ActivityIndicator size="large" color="#F99393" />
+            </View>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screenContainer}>
@@ -36,10 +81,10 @@ export default function SettingsScreen() {
               <TouchableOpacity style={styles.glassCard} activeOpacity={0.8} onPress={handleCoachPress}>
                 <View style={styles.coachRow}>
                   <Image 
-                    source={{ uri: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400' }}
+                    source={{ uri: selectedCoach?.image_url || 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400' }}
                     style={styles.coachAvatar}
                   />
-                  <Text style={styles.coachName}>James</Text>
+                  <Text style={styles.coachName}>{selectedCoach?.name || 'Select Coach'}</Text>
                   <ChevronRight color="white" size={20} />
                 </View>
               </TouchableOpacity>
@@ -51,22 +96,15 @@ export default function SettingsScreen() {
               <TouchableOpacity style={styles.glassCard} activeOpacity={0.8} onPress={handleClassPress}>
                 <View style={styles.classContent}>
                   <View style={styles.classHeader}>
-                    <Text style={styles.className}>Mixed Level 1</Text>
+                    <Text style={styles.className}>{classDisplayInfo.name}</Text>
                     <ChevronRight color="white" size={20} />
                   </View>
                   <View style={styles.tagsContainer}>
-                    <View style={styles.tag}>
-                      <Text style={styles.tagText}>Maths</Text>
-                    </View>
-                    <View style={styles.tag}>
-                      <Text style={styles.tagText}>Memory</Text>
-                    </View>
-                    <View style={styles.tag}>
-                      <Text style={styles.tagText}>Word</Text>
-                    </View>
-                    <View style={styles.tag}>
-                      <Text style={styles.tagText}>Facts</Text>
-                    </View>
+                    {classDisplayInfo.tags.map((tag, index) => (
+                      <View key={index} style={styles.tag}>
+                        <Text style={styles.tagText}>{tag}</Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
               </TouchableOpacity>
@@ -80,7 +118,7 @@ export default function SettingsScreen() {
               </Text>
               <TouchableOpacity style={styles.glassCard} activeOpacity={0.8} onPress={handleTimerPress}>
                 <View style={styles.timerRow}>
-                  <Text style={styles.timerText}>20 minutes</Text>
+                  <Text style={styles.timerText}>{timerSeconds} minutes</Text>
                   <ChevronRight color="white" size={20} />
                 </View>
               </TouchableOpacity>

@@ -1,65 +1,70 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from '../components/SafeAreaView';
-import { ChevronLeft } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView } from '../components/SafeAreaView';
+import { useApp } from '../contexts/AppContext';
+import { ChevronLeft } from 'lucide-react-native';
 
-const timeOptions = [
-  { id: '5', name: '5 minutes', isSelected: false },
-  { id: '10', name: '10 minutes', isSelected: false },
-  { id: '15', name: '15 minutes', isSelected: false },
-  { id: '20', name: '20 minutes', isSelected: true },
-  { id: '25', name: '25 minutes', isSelected: false },
-  { id: '30', name: '30 minutes', isSelected: false },
-  { id: '35', name: '35 minutes', isSelected: false },
-  { id: '40', name: '40 minutes', isSelected: false },
-];
+const { width } = Dimensions.get('window');
+const maxWidth = Math.min(width, 400);
+
+const TIMER_PRESETS = [5, 10, 15, 20, 25, 30];
 
 export default function SleepTimerScreen() {
   const router = useRouter();
-  const [selectedTime, setSelectedTime] = useState('20');
+  const { timerSeconds, setTimer } = useApp();
+  const [tempSelectedTimer, setTempSelectedTimer] = useState(timerSeconds);
 
-  const handleBackPress = () => {
+  const handleTimerSelect = (seconds: number) => {
+    setTempSelectedTimer(seconds);
+  };
+
+  const handleBackPress = async () => {
+    if (tempSelectedTimer !== timerSeconds) {
+      await setTimer(tempSelectedTimer);
+    }
     router.back();
   };
 
-  const handleTimeSelect = (timeId: string) => {
-    setSelectedTime(timeId);
-  };
+  const renderTimer = ({ item }: { item: number }) => (
+    <TouchableOpacity
+      style={[
+        styles.timerCard,
+        item === tempSelectedTimer && styles.selectedTimerCard
+      ]}
+      onPress={() => handleTimerSelect(item)}
+      activeOpacity={0.8}
+    >
+      <Text style={styles.timerText}>{item} minutes</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.screenContainer}>
-      <StatusBar
-        style="light"
-        backgroundColor="transparent"
-        translucent={true}
-      />
       <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-            <ChevronLeft color="white" size={24} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Sleep Timer</Text>
-          <View style={styles.spacer} />
-        </View>
-
-        {/* Content */}
-        <View style={styles.content}>
-          {timeOptions.map((timeOption) => (
-            <TouchableOpacity
-              key={timeOption.id}
-              style={[
-                styles.timeCard,
-                selectedTime === timeOption.id && styles.selectedCard
-              ]}
-              onPress={() => handleTimeSelect(timeOption.id)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.timeText}>{timeOption.name}</Text>
+        <View style={[styles.mobileContainer, { maxWidth }]}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+              <ChevronLeft color="white" size={24} />
             </TouchableOpacity>
-          ))}
+            <Text style={styles.title}>Choose Timer</Text>
+            <View style={styles.placeholder} />
+          </View>
+
+          {/* Description */}
+          <Text style={styles.description}>
+            You can change this during a sleep sequence as well.
+          </Text>
+
+          {/* Timer Options */}
+          <FlatList
+            data={TIMER_PRESETS}
+            renderItem={renderTimer}
+            keyExtractor={(item) => item.toString()}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+          />
         </View>
       </SafeAreaView>
     </View>
@@ -69,18 +74,23 @@ export default function SleepTimerScreen() {
 const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
-    backgroundColor: '#15131A',
+    backgroundColor: '#15131A', // Solid dark background
   },
   container: {
     flex: 1,
-    backgroundColor: '#15131A',
+    backgroundColor: '#15131A', // Ensure container also has background
+  },
+  mobileContainer: {
+    flex: 1,
+    width: '100%',
+    paddingHorizontal: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
     paddingVertical: 16,
+    marginBottom: 16,
   },
   backButton: {
     padding: 8,
@@ -90,20 +100,25 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '300',
   },
-  spacer: {
+  placeholder: {
     width: 40,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 120,
-    paddingTop: 20,
+  description: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+    fontWeight: '300',
+    marginBottom: 24,
+    lineHeight: 20,
   },
-  timeCard: {
+  listContainer: {
+    paddingBottom: 20,
+  },
+  timerCard: {
     backgroundColor: 'rgba(121, 75, 214, 0.1)',
     borderRadius: 24,
     padding: 20,
-    marginBottom: 12,
+    marginBottom: 16,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
@@ -112,14 +127,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  selectedCard: {
-    backgroundColor: 'rgba(118, 77, 213, 1)',
+  selectedTimerCard: {
+    backgroundColor: 'rgba(121, 75, 214, 0.3)',
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  timeText: {
+  timerText: {
     color: 'white',
     fontSize: 18,
-    fontWeight: '300',
-    textAlign: 'center',
+    fontWeight: '400',
   },
 }); 

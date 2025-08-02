@@ -1,20 +1,62 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Asset } from 'expo-asset';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { NetworkStatus } from '../../components/NetworkStatus';
 import { SafeAreaView } from '../../components/SafeAreaView';
 import PlayButton from '../../components/PlayButton';
+import { useApp } from '../../contexts/AppContext';
 
 const { width } = Dimensions.get('window');
 const maxWidth = Math.min(width, 400);
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { coaches, classes, selectedCoachId, selectedClassId, timerSeconds, isLoading } = useApp();
+
+  const selectedCoach = coaches.find(c => c.id === selectedCoachId);
+  const selectedClass = classes.find(c => c.id === selectedClassId);
+
+  // Get the display name for the selected class
+  const getClassDisplayName = () => {
+    if (selectedClassId === 'mixed-level-1') {
+      return 'All Tasks';
+    }
+    
+    // For individual classes, map the ID to display name
+    const classDisplayNames: { [key: string]: string } = {
+      'maths': 'Maths',
+      'memory': 'Memory', 
+      'word': 'Word',
+      'facts': 'Facts'
+    };
+    
+    return classDisplayNames[selectedClassId] || selectedClass?.name || 'Select Class';
+  };
 
   const handlePlayButtonPress = () => {
     router.push('/sleep-session');
   };
+
+  // Prefetch the background image for smooth transitions
+  useEffect(() => {
+    Asset.loadAsync(require('../../assets/images/THETA-BG.png'));
+  }, []);
+
+  if (isLoading) {
+    return (
+      <View style={styles.screenContainer}>
+        <SafeAreaView style={styles.container}>
+          <View style={[styles.mobileContainer, { maxWidth }]}>
+            <View style={styles.content}>
+              <ActivityIndicator size="large" color="#F99393" />
+            </View>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -74,11 +116,11 @@ export default function HomeScreen() {
                   <View style={[styles.glassCard, styles.coachCard]}>
                     <View style={styles.coachInfo}>
                       <Text style={styles.cardTitle}>Coach</Text>
-                      <Text style={styles.cardSubtitle}>James</Text>
+                      <Text style={styles.cardSubtitle}>{selectedCoach?.name || 'Select Coach'}</Text>
                     </View>
                     <View style={styles.coachImageContainer}>
                       <Image 
-                        source={{ uri: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400' }}
+                        source={{ uri: selectedCoach?.image_url || 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400' }}
                         style={styles.coachImage}
                       />
                     </View>
@@ -89,13 +131,13 @@ export default function HomeScreen() {
                     {/* Class Card */}
                     <View style={[styles.glassCard, styles.smallCard]}>
                       <Text style={styles.cardTitle}>Class</Text>
-                      <Text style={styles.cardSubtitle}>All Classes</Text>
+                      <Text style={styles.cardSubtitle}>{getClassDisplayName()}</Text>
                     </View>
 
                     {/* Timer Card */}
                     <View style={[styles.glassCard, styles.smallCard]}>
                       <Text style={styles.cardTitle}>Timer</Text>
-                      <Text style={styles.cardSubtitle}>20 minutes</Text>
+                      <Text style={styles.cardSubtitle}>{timerSeconds} minutes</Text>
                     </View>
                   </View>
                 </View>
