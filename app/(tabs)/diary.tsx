@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,69 +7,19 @@ import {
   Dimensions,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from '../../components/SafeAreaView';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, G } from 'react-native-svg';
 import { RatingBottomSheet } from '../../components/RatingBottomSheet';
+import { supabase } from '../../lib/supabase';
 
 const { width } = Dimensions.get('window');
 const maxWidth = Math.min(width, 400);
 
-// Mock data for diary entries
-const diaryEntries = [
-  {
-    id: 1,
-    date: 'Thu 30 May',
-    coach: 'Professor Joe',
-    level: 'Mixed Level 1',
-    status: 'Good',
-    statusColor: '#4ADE80',
-  },
-  {
-    id: 2,
-    date: 'Thu 30 May',
-    coach: 'Professor Joe',
-    level: 'Mixed Level 1',
-    status: 'Rate',
-    statusColor: '#8B5CF6',
-    isRateButton: true,
-  },
-  {
-    id: 3,
-    date: 'Thu 30 May',
-    coach: 'Professor Joe',
-    level: 'Mixed Level 1',
-    status: 'Poor',
-    statusColor: '#F87171',
-  },
-  {
-    id: 4,
-    date: 'Wed 29 May',
-    coach: 'Professor Joe',
-    level: 'Mixed Level 1',
-    status: 'Good',
-    statusColor: '#4ADE80',
-  },
-  {
-    id: 5,
-    date: 'Tue 28 May',
-    coach: 'Professor Joe',
-    level: 'Mixed Level 1',
-    status: 'Rate',
-    statusColor: '#8B5CF6',
-    isRateButton: true,
-  },
-  {
-    id: 6,
-    date: 'Mon 27 May',
-    coach: 'Professor Joe',
-    level: 'Mixed Level 1',
-    status: 'Good',
-    statusColor: '#4ADE80',
-  },
-];
+// Remove mock data - will be replaced with real data from database
 
 interface Segment {
   value: number;   // percentage (0–100)
@@ -89,11 +39,23 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
   const radius = (size - strokeWidth) / 2;
   const C = 2 * Math.PI * radius;
 
-  // compute each arc in px, subtracting the gap from its painted length
-  const arcLengths = segments.map(s => (s.value / 100) * C - gapSize);
-  // compute offsets so each segment starts after the last + gap
+  // Calculate total gap space needed
+  const totalGaps = segments.length > 1 ? segments.length : 0;
+  const totalGapSpace = totalGaps * gapSize;
+  
+  // Calculate available space for segments (total circumference minus gaps)
+  const availableSpace = C - totalGapSpace;
+  
+  // Compute each arc length proportionally
+  const arcLengths = segments.map(s => (s.value / 100) * availableSpace);
+  
+  // Compute offsets with proper gap spacing
   const offsets = arcLengths.reduce<number[]>((acc, len, i) => {
-    acc[i] = i === 0 ? 0 : acc[i - 1] + arcLengths[i - 1] + gapSize;
+    if (i === 0) {
+      acc[i] = 0;
+    } else {
+      acc[i] = acc[i - 1] + arcLengths[i - 1] + gapSize;
+    }
     return acc;
   }, []);
 
@@ -173,16 +135,234 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
 export default function DiaryScreen() {
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetDate, setSheetDate] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [diaryEntries, setDiaryEntries] = useState<any[]>([]);
+  
+  // Add month selector state
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  const fetchDiaryEntries = async () => {
+    try {
+      setLoading(true);
+      console.log('Fetching diary entries from session_complete table...');
+
+      const { data, error } = await supabase
+        .from('session_complete')
+        .select('id, session_date, coach_name, class_name, rating')
+        .order('session_date', { ascending: false });
+
+      console.log('Supabase response:', { data, error });
+
+      if (error) {
+        console.error('Supabase error:', error);
+        setLoading(false);
+        return;
+      }
+
+      if (!data?.length) {
+        console.log('No data returned from database');
+        setDiaryEntries([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log('Raw data from database:', data);
+      console.log('Number of entries:', data.length);
+
+      const formattedEntries = data.map(row => {
+        console.log('Processing entry:', row);
+        
+        const d = new Date(row.session_date);
+        const dateLabel = [
+          d.toLocaleDateString('en-US', { weekday: 'short' }),
+          d.getDate(),
+          d.toLocaleDateString('en-US', { month: 'short' }),
+        ].join(' ');
+
+        let isRateButton = false;
+        let statusColor: string|null = null;
+        let statusText: string|null = null;
+
+        if (!row.rating) {
+          isRateButton = true;
+        } else {
+          switch (row.rating) {
+            case 'Good':
+              statusText = 'Good';
+              statusColor = '#4ADE80';
+              break;
+            case 'OK':
+              statusText = 'OK';
+              statusColor = '#60A5FA';
+              break;
+            case 'Poor':
+              statusText = 'Poor';
+              statusColor = '#F87171';
+              break;
+            default:
+              isRateButton = true;
+          }
+        }
+
+        const formattedEntry = {
+          id: row.id,
+          date: dateLabel,
+          coach: row.coach_name,
+          level: row.class_name,
+          status: statusText,
+          statusColor,
+          isRateButton,
+          originalDate: row.session_date,
+        };
+        
+        console.log('Formatted entry:', formattedEntry);
+        return formattedEntry;
+      });
+
+      console.log('Final formatted entries:', formattedEntries);
+      setDiaryEntries(formattedEntries);
+    } catch (err) {
+      console.error('Error fetching diary entries:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Month navigation logic
+  const today = new Date();
+  const isNextDisabled =
+    selectedDate.getFullYear() === today.getFullYear() &&
+    selectedDate.getMonth() === today.getMonth();
+
+  const handlePrevMonth = () => {
+    setSelectedDate(prev =>
+      new Date(prev.getFullYear(), prev.getMonth() - 1, 1),
+    );
+  };
+  
+  const handleNextMonth = () => {
+    if (!isNextDisabled) {
+      setSelectedDate(prev =>
+        new Date(prev.getFullYear(), prev.getMonth() + 1, 1),
+      );
+    }
+  };
+
+  const monthText = selectedDate
+    .toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    .toUpperCase();
+
+  // Filter entries for the selected month
+  const filteredEntries = diaryEntries.filter(entry => {
+    const d = new Date(entry.originalDate);
+    return (
+      d.getFullYear() === selectedDate.getFullYear() &&
+      d.getMonth() === selectedDate.getMonth()
+    );
+  });
+
+  // Tally ratings for the selected month
+  const ratingCounts = filteredEntries.reduce(
+    (acc, e) => {
+      if (e.status === 'Good') acc.good++;
+      if (e.status === 'OK') acc.ok++;
+      if (e.status === 'Poor') acc.poor++;
+      return acc;
+    },
+    { good: 0, ok: 0, poor: 0 }
+  );
+
+  const totalCount = ratingCounts.good + ratingCounts.ok + ratingCounts.poor;
+
+  // Build dynamic segments array
+  let circleSegments: { value: number; color: string }[];
+
+  if (totalCount === 0) {
+    // No ratings → full 100% purple ring
+    circleSegments = [
+      { value: 100, color: '#794BD6' }
+    ];
+  } else {
+    circleSegments = [
+      // Only include each slice if count > 0
+      ...(ratingCounts.good > 0
+        ? [{ value: (ratingCounts.good / totalCount) * 100, color: '#4ADE80' }]
+        : []),
+      ...(ratingCounts.ok > 0
+        ? [{ value: (ratingCounts.ok / totalCount) * 100, color: '#60A5FA' }]
+        : []),
+      ...(ratingCounts.poor > 0
+        ? [{ value: (ratingCounts.poor / totalCount) * 100, color: '#F87171' }]
+        : []),
+    ];
+  }
+
+  useEffect(() => {
+    fetchDiaryEntries();
+    
+    // Force loading to false after 5 seconds to prevent infinite loading
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.log('Forcing loading to false after timeout');
+        setLoading(false);
+      }
+    }, 5000);
+    
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, []);
 
   function onPressRate(date: string) {
     setSheetDate(date);
     setSheetVisible(true);
   }
 
-  function handleSubmit(rating: 'Good' | 'OK' | 'Poor') {
-    // save the rating…
-    console.log(`Rating submitted for ${sheetDate}: ${rating}`);
-    setSheetVisible(false);
+  async function handleSubmit(rating: 'Good' | 'OK' | 'Poor') {
+    const entryToUpdate = diaryEntries.find(entry => entry.date === sheetDate);
+
+    if (!entryToUpdate) {
+      console.error('No diary entry found for date:', sheetDate);
+      setSheetVisible(false);
+      return;
+    }
+
+    // Validate rating value
+    if (!['Good', 'OK', 'Poor'].includes(rating)) {
+      console.error('Invalid rating submitted:', rating);
+      setSheetVisible(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('session_complete')
+        .update({ rating: rating }) // Send exact case to match DB constraint
+        .eq('id', entryToUpdate.id)
+        .select(); // fetch the updated row
+
+      if (error) {
+        console.error('Supabase error during update:', JSON.stringify(error, null, 2));
+      } else {
+        console.log('Successfully updated rating:', data);
+        fetchDiaryEntries();
+      }
+    } catch (err) {
+      console.error('Unexpected error updating rating:', err);
+    } finally {
+      setSheetVisible(false);
+    }
+  }
+
+  console.log('Diary render state:', { loading, diaryEntriesLength: diaryEntries.length });
+  
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="white" />
+        <Text style={styles.loadingText}>Loading diary entries...</Text>
+      </View>
+    );
   }
 
   return (
@@ -198,28 +378,31 @@ export default function DiaryScreen() {
                 size={120}
                 strokeWidth={12}
                 gapSize={18}
-                segments={[
-                  { value: 50, color: '#9DEABB' },  // "Good"
-                  { value: 30, color: '#9DEADD' },  // "OK"
-                  { value: 20, color: '#F6B6B6' },  // "Bad"
-                ]}
+                segments={circleSegments}
               />
               
-              {/* Inner circle */}
-              
-              
-              
+              {/* Inner circle removed - no longer needed */}
             </View>
 
             {/* Month Navigation */}
             <View style={styles.monthNavigation}>
-              <TouchableOpacity style={styles.navButton}>
+              <TouchableOpacity 
+                style={styles.navButton}
+                onPress={handlePrevMonth}
+              >
                 <ChevronLeft color="white" size={20} />
               </TouchableOpacity>
 
-              <Text style={styles.monthText}>MAY</Text>
+              <Text style={styles.monthText}>{monthText}</Text>
 
-              <TouchableOpacity style={styles.navButton}>
+              <TouchableOpacity 
+                style={[
+                  styles.navButton,
+                  isNextDisabled && styles.disabledNavButton,
+                ]}
+                onPress={handleNextMonth}
+                disabled={isNextDisabled}
+              >
                 <ChevronRight color="white" size={20} />
               </TouchableOpacity>
             </View>
@@ -232,57 +415,64 @@ export default function DiaryScreen() {
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
             >
-              {diaryEntries.map((entry, index) => {
-                const isFirst = index === 0;
-                return (
-                  <View
-                    key={entry.id}
-                    style={
-                      isFirst
-                        ? styles.firstEntryContainer
-                        : styles.entryContainer
-                    }
-                  >
-                    <Text style={styles.entryDate}>{entry.date}</Text>
-                    <View style={styles.glassCard}>
-                      <View style={styles.entryContent}>
-                        <View style={styles.entryLeft}>
-                          <Text style={styles.coachName}>
-                            {entry.coach}
-                          </Text>
-                          <Text style={styles.levelText}>
-                            {entry.level}
-                          </Text>
-                        </View>
-                        <View style={styles.entryRight}>
-                          {entry.isRateButton ? (
-                            <TouchableOpacity 
-                              style={styles.rateButton}
-                              onPress={() => onPressRate(entry.date)}
-                            >
-                              <Text style={styles.rateButtonText}>
-                                Rate
-                              </Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={styles.statusContainer}>
-                              <Text style={styles.statusText}>
-                                {entry.status}
-                              </Text>
-                              <View
-                                style={[
-                                  styles.statusDot,
-                                  { backgroundColor: entry.statusColor },
-                                ]}
-                              />
-                            </View>
-                          )}
+              {filteredEntries.length > 0 ? (
+                filteredEntries.map((entry, index) => {
+                  const isFirst = index === 0;
+                  return (
+                    <View
+                      key={entry.id}
+                      style={
+                        isFirst
+                          ? styles.firstEntryContainer
+                          : styles.entryContainer
+                      }
+                    >
+                      <Text style={styles.entryDate}>{entry.date}</Text>
+                      <View style={styles.glassCard}>
+                        <View style={styles.entryContent}>
+                          <View style={styles.entryLeft}>
+                            <Text style={styles.coachName}>
+                              {entry.coach}
+                            </Text>
+                            <Text style={styles.levelText}>
+                              {entry.level}
+                            </Text>
+                          </View>
+                          <View style={styles.entryRight}>
+                            {entry.isRateButton ? (
+                              <TouchableOpacity 
+                                style={styles.rateButton}
+                                onPress={() => onPressRate(entry.date)}
+                              >
+                                <Text style={styles.rateButtonText}>
+                                  Rate
+                                </Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <View style={styles.statusContainer}>
+                                <Text style={styles.statusText}>
+                                  {entry.status}
+                                </Text>
+                                <View
+                                  style={[
+                                    styles.statusDot,
+                                    { backgroundColor: entry.statusColor },
+                                  ]}
+                                />
+                              </View>
+                            )}
+                          </View>
                         </View>
                       </View>
                     </View>
-                  </View>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>No entries for {monthText}</Text>
+                  <Text style={styles.emptyStateSubtext}>Complete a sleep session to see your diary entries here</Text>
+                </View>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -313,6 +503,34 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     paddingHorizontal: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 16,
+    marginTop: 10,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+    textAlign: 'center',
   },
 
   //////////////////////////////////////////////////////
@@ -349,6 +567,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  disabledNavButton: {
+    opacity: 0.3,
   },
   monthText: {
     color: 'white',
@@ -453,15 +674,6 @@ const styles = StyleSheet.create({
   progressContainer: {
     alignItems: 'center',
     marginBottom: 12,
-  },
-  innerCircle: {
-    position: 'absolute',
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
   legendContainer: {
     flexDirection: 'row',

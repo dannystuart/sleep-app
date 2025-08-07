@@ -83,10 +83,10 @@ export default function HomeScreen() {
               <View style={styles.streakCard}>
                 <View style={styles.streakContent}>
                   <View style={styles.streakLeft}>
-                    <Text style={styles.streakTitle}>Current Streak</Text>
+                    <Text style={styles.streakTitle}>Your Streak</Text>
                     
                     <View style={styles.daysContainer}>
-                      {['Mon', 'Tue', 'Wed', 'Thu'].map((day, index) => (
+                      {['Mo', 'Tu', 'We', 'Th', 'Fr'].map((day, index) => (
                         <View key={day} style={styles.dayItem}>
                           <Image 
                             source={require('../../assets/images/moon-icon.png')}

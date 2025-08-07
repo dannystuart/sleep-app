@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   InteractionManager,
   ImageBackground,
+  Image,
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Asset } from 'expo-asset';
@@ -14,7 +15,8 @@ import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from '../components/SafeAreaView';
 import { useApp } from '../contexts/AppContext';
-import { ChevronLeft, Play, Pause, SkipBack } from 'lucide-react-native';
+import { ChevronLeft, Play, Pause, SkipBack, Clock, PauseCircle } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function SleepSessionScreen() {
   const router = useRouter();
@@ -278,48 +280,92 @@ export default function SleepSessionScreen() {
           <View style={{width:24}}/>
         </View>
 
-        {/* INFO */}
-        <View style={styles.info}>
-          <Text style={styles.infoText}>{coach.name} • {getClassDisplayName()}</Text>
-          <Text style={styles.duration}>{timerSeconds} min</Text>
-          {!hasAudio && (
-            <Text style={styles.noAudioText}>Timer only - no audio available</Text>
-          )}
+        {/* PROFILE SECTION */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileImageContainer}>
+            <Image 
+              source={{ uri: coach.image_url || 'https://via.placeholder.com/200x200' }}
+              style={styles.profileImage}
+            />
+            <View style={styles.nameTag}>
+              <Text style={styles.nameTagText}>{coach.name}</Text>
+            </View>
+          </View>
+          
+          {/* CLASS CARD */}
+          <View style={styles.classCard}>
+            <Text style={styles.classCardTitle}>Class</Text>
+            <Text style={styles.classCardText}>{getClassDisplayName()}</Text>
+          </View>
         </View>
 
-        {/* PROGRESS */}
-        <TouchableOpacity 
-          style={styles.progressBarContainer} 
-          onPress={hasAudio ? onProgressBarPress : undefined}
-          activeOpacity={hasAudio ? 0.8 : 1}
-          disabled={!hasAudio}
-        >
-          <View 
-            ref={progressBarRef}
-            style={[styles.progressBar, !hasAudio && styles.progressBarDisabled]}
-            onLayout={(event) => {
-              const { width } = event.nativeEvent.layout;
-              setProgressBarWidth(width);
-            }}
-          >
-            <View style={[styles.progressFill, { width:`${progress*100}%` }]} />
+        {/* DURATION SECTION */}
+        <View style={styles.durationSection}>
+          <View style={styles.durationRow}>
+            <Clock color="white" size={20} />
+            <Text style={styles.durationText}>{timerSeconds} minutes</Text>
           </View>
-        </TouchableOpacity>
-        <Text style={styles.timeText}>{fmt(audioPosition)} / {fmt(length)}</Text>
+        </View>
 
-        {/* CONTROLS */}
-        <View style={styles.controls}>
-          <TouchableOpacity style={styles.ctrlBtn}><SkipBack color="white" size={24}/></TouchableOpacity>
+        {/* PLAY BUTTON */}
+        <View style={styles.playButtonSection}>
           <TouchableOpacity 
-            style={[styles.playBtn, (!hasAudio || !soundRef.current) && styles.playBtnDisabled]} 
+            activeOpacity={0.8} 
             onPress={togglePlay}
             disabled={!hasAudio || !soundRef.current}
+            style={(!hasAudio || !soundRef.current) && styles.playButtonDisabled}
           >
-            {isPlaying ? <Pause color="white" size={32}/> : <Play color="white" size={32}/>}
+            <LinearGradient
+              colors={isPlaying ? ['#413A6D', '#221D55'] : ['#B3ACE9', '#5B45DD']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.outerCircle}
+            >
+              <LinearGradient
+                colors={isPlaying ? ['#381E6D', '#161E4B'] : ['#794BD6', '#585ED2']}
+                start={{ x: 0, y: 1 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.innerCircle}
+              >
+                {isPlaying ? (
+                  <Image 
+                  source={require('../assets/images/pause-icon.png')}
+                  style={styles.playIcon}
+                />
+                ) : (
+                  <Image 
+                    source={require('../assets/images/play-btn-icon.png')}
+                    style={styles.playIcon}
+                  />
+                )}
+              </LinearGradient>
+            </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.ctrlBtn}>
-            <SkipBack color="white" size={24} style={{transform:[{scaleX:-1}]}}/>
+        </View>
+
+        {/* PROGRESS BAR */}
+        <View style={styles.progressSection}>
+          <TouchableOpacity 
+            style={styles.progressBarContainer} 
+            onPress={hasAudio ? onProgressBarPress : undefined}
+            activeOpacity={hasAudio ? 0.8 : 1}
+            disabled={!hasAudio}
+          >
+            <View 
+              ref={progressBarRef}
+              style={[styles.progressBar, !hasAudio && styles.progressBarDisabled]}
+              onLayout={(event) => {
+                const { width } = event.nativeEvent.layout;
+                setProgressBarWidth(width);
+              }}
+            >
+              <View style={[styles.progressFill, { width:`${progress*100}%` }]} />
+            </View>
           </TouchableOpacity>
+          <View style={styles.progressTimer}>
+          <Text style={styles.timeText}>{fmt(audioPosition)}</Text>
+          <Text style={styles.fullText}>{fmt(length)}</Text>
+          </View>
         </View>
       </SafeAreaView>
     </View>
@@ -331,44 +377,170 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000',
   },
-  container: {flex:1, paddingHorizontal:20},
-  header: {flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginTop:16, marginBottom:40},
-  title: {color:'white', fontSize:20, fontWeight:'300'},
-  info: {alignItems:'center', marginBottom:60},
-  infoText: {color:'white', fontSize:24},
-  duration: {color:'rgba(255,255,255,0.7)', fontSize:16, marginTop:4},
-  noAudioText: {
-    color: 'rgba(255,255,255,0.5)',
+  container: {
+    flex: 1, 
+    paddingHorizontal: 20
+  },
+  header: {
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginTop: 16, 
+    marginBottom: 40
+  },
+  title: {
+    color: 'white', 
+    fontSize: 20, 
+    fontWeight: '300'
+  },
+  profileSection: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  profileImageContainer: {
+    position: 'relative',
+  },
+  profileImage: {
+    width: 240,
+    height: 220,
+    borderRadius: 24,
+    backgroundColor: 'rgba(147, 112, 219, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  nameTag: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    backgroundColor: 'rgba(147, 112, 219, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  nameTagText: {
+    color: 'white',
     fontSize: 14,
-    marginTop: 8,
+    fontWeight: '600',
+  },
+  classCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: 240,
+    backgroundColor: 'rgba(121, 75, 214, 0.1)',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+    marginTop: 16,
+  },
+  classCardText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '400',
+  },
+
+  classCardTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: '400',
+  },
+
+  durationSection: {
+    alignItems: 'center',
+    marginBottom: 60,
+  },
+  durationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  durationText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '400',
+  },
+  playButtonSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  outerCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  innerCircle: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 60,
+    backgroundColor: '#3e2d86',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playButtonDisabled: {
+    opacity: 0.5,
+  },
+  playIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+  },
+  progressSection: {
+    alignItems: 'center',
   },
   progressBarContainer: {
     alignItems: 'center',
-    marginVertical: 16,
-    paddingVertical: 8, // Add padding for better touch target
+    marginVertical: 4,
+    paddingVertical: 8,
+    width: '100%',
   },
   progressBar: {
-    height: 12, // Slightly taller for better touch target
-    backgroundColor: 'rgba(255,255,255,0.1)', 
-    borderRadius: 6, 
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)', 
+    borderRadius: 2, 
     overflow: 'hidden', 
     width: '100%',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
   progressFill: {
     height: '100%', 
-    backgroundColor: '#F99393', 
-    borderRadius: 6,
+    backgroundColor: 'white', 
+    borderRadius: 2,
   },
   progressBarDisabled: {
     opacity: 0.5,
   },
-  timeText:{color:'white', textAlign:'center', marginBottom:60},
-  controls:{flexDirection:'row', justifyContent:'center', alignItems:'center', gap:40},
-  ctrlBtn:{width:48, height:48, borderRadius:24, backgroundColor:'rgba(255,255,255,0.1)', alignItems:'center', justifyContent:'center'},
-  playBtn:{width:80, height:80, borderRadius:40, backgroundColor:'#F99393', alignItems:'center', justifyContent:'center'},
-  playBtnDisabled: {
-    opacity: 0.5,
+  timeText: {
+    color: 'white', 
+    textAlign: 'center',
+    fontSize: 14,
+    marginTop: 0,
   },
+  progressTimer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  fullText: {
+
+    color: 'white', 
+    textAlign: 'center',
+    fontSize: 14,
+    marginTop: 0,
+
+  },
+
 }); 
