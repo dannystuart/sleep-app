@@ -20,7 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 export default function SleepSessionScreen() {
   const router = useRouter();
-  const { coaches, classes, sessionAudio, selectedCoachId, selectedClassId, timerSeconds, logEvent, isLoading } = useApp();
+  const { coaches, classes, sessionAudio, selectedCoachId, selectedClassId, timerSeconds, logEvent, isLoading, streak } = useApp();
   const coach = coaches.find(c => c.id === selectedCoachId);
   const cls = classes.find(c => c.id === selectedClassId);
   
@@ -101,6 +101,8 @@ export default function SleepSessionScreen() {
   // session logic - load & play one track
   const startSession = async () => {
     try {
+      console.log('🚀 Starting session with timer:', timerSeconds, 'minutes');
+      
       // 1. Analytics
       await logEvent({ 
         event_type: 'session_start', 
@@ -118,14 +120,16 @@ export default function SleepSessionScreen() {
       
       // 3. Check if audio URL is valid
       if (!hasAudio) {
-        console.warn('No audio available for this coach+class combination, running timer-only session');
+        console.warn('🔇 No audio available for this coach+class combination, running timer-only session');
         // Start timer without audio
         sessionEndTime.current = Date.now() + timerSeconds * 60_000;
+        console.log('⏰ Timer-only session end time:', new Date(sessionEndTime.current).toLocaleTimeString());
         startTimer();
         return;
       }
       
       // 4. Load & play the single MP3
+      console.log('🎵 Loading audio:', audioUrl);
       const { sound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
         { shouldPlay: true }
@@ -136,9 +140,10 @@ export default function SleepSessionScreen() {
       
       // 5. Start countdown timer
       sessionEndTime.current = Date.now() + timerSeconds * 60_000;
+      console.log('⏰ Session end time set to:', new Date(sessionEndTime.current).toLocaleTimeString());
       startTimer();
     } catch (error) {
-      console.error('Error starting session:', error);
+      console.error('❌ Error starting session:', error);
       // Fallback: start timer without audio
       sessionEndTime.current = Date.now() + timerSeconds * 60_000;
       startTimer();
@@ -156,18 +161,29 @@ export default function SleepSessionScreen() {
 
   // Finish & cleanup when timer ends
   const finishSession = async () => {
+    console.log('🎯 finishSession called!');
     try {
       clearInterval(timerRef.current!);
+      console.log('📊 Logging session event...');
       await logEvent({ 
         event_type: 'session_complete', 
         coach_id: coach.id, 
         class_id: cls.id, 
         timer_seconds: timerSeconds 
       });
+
+      console.log('🔥 Updating streak and diary...');
+      // NEW: update streak + diary
+      const result = await streak.onSessionComplete({ 
+        coachName: coach.name, 
+        className: getClassDisplayName() 
+      });
+      console.log('✅ Streak update result:', result);
+
       cleanupSession();
       router.back();
     } catch (error) {
-      console.error('Error finishing session:', error);
+      console.error('❌ Error finishing session:', error);
       cleanupSession();
       router.back();
     }
@@ -213,6 +229,7 @@ export default function SleepSessionScreen() {
 
   // Timer management functions
   const startTimer = () => {
+    console.log('⏰ Starting timer for', timerSeconds, 'minutes');
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
@@ -220,7 +237,16 @@ export default function SleepSessionScreen() {
       const rem = Math.max(0, sessionEndTime.current - Date.now());
       const sessionProgress = timerSeconds * 60_000 - rem;
       setPosition(sessionProgress);
-      if (rem <= 0) finishSession();
+      
+      // Debug timer progress
+      if (Math.floor(rem / 1000) % 10 === 0) { // Log every 10 seconds
+        console.log('⏱️ Timer remaining:', Math.floor(rem / 1000), 'seconds');
+      }
+      
+      if (rem <= 0) {
+        console.log('🎯 Timer finished - calling finishSession');
+        finishSession();
+      }
     }, 500);
   };
 
@@ -366,6 +392,46 @@ export default function SleepSessionScreen() {
           <Text style={styles.timeText}>{fmt(audioPosition)}</Text>
           <Text style={styles.fullText}>{fmt(length)}</Text>
           </View>
+        </View>
+
+        {/* TEST BUTTON - Remove this after testing */}
+        <View style={styles.testSection}>
+          <TouchableOpacity 
+            style={styles.testButton}
+            onPress={() => {
+              console.log('🧪 Test button pressed - manually completing session');
+              finishSession();
+            }}
+          >
+            <Text style={styles.testButtonText}>🧪 Complete Session (Test)</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.testButton, { backgroundColor: '#4CAF50', marginTop: 10 }]}
+            onPress={() => {
+              console.log('🧪 Manual streak increment test button pressed');
+              console.log('🔍 streak object:', streak);
+              console.log('🔍 testIncrementStreak function:', streak.testIncrementStreak);
+              if (streak.testIncrementStreak) {
+                console.log('✅ Calling testIncrementStreak...');
+                streak.testIncrementStreak();
+              } else {
+                console.log('❌ testIncrementStreak function not found');
+              }
+            }}
+          >
+            <Text style={styles.testButtonText}>🧪 Increment Streak (Test)</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.testButton, { backgroundColor: '#FF9800', marginTop: 10 }]}
+            onPress={() => {
+              console.log('🧪 Direct streak test - calling finishSession directly');
+              finishSession();
+            }}
+          >
+            <Text style={styles.testButtonText}>🧪 Direct Session Complete</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </View>
@@ -541,6 +607,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 0,
 
+  },
+  testSection: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  testButton: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 
 }); 

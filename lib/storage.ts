@@ -4,6 +4,9 @@ export const STORAGE_KEYS = {
   coachId: '@theta/coachId',
   classId: '@theta/classId',
   timerSeconds: '@theta/timerSeconds',
+  streak: '@theta/streak',
+  diary: '@theta/diary',
+  announcements: '@theta/announcements',
 } as const;
 
 export type StorageKey = keyof typeof STORAGE_KEYS;

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Asset } from 'expo-asset';
@@ -7,13 +7,40 @@ import { NetworkStatus } from '../../components/NetworkStatus';
 import { SafeAreaView } from '../../components/SafeAreaView';
 import PlayButton from '../../components/PlayButton';
 import { useApp } from '../../contexts/AppContext';
+import { StreakPublicState } from '../../types';
+import { DebugPanel } from '../../components/DebugPanel';
+import { StreakSheet } from '../../components/StreakSheet';
+import { AnnouncementSheet } from '../../components/AnnouncementSheet';
 
 const { width } = Dimensions.get('window');
 const maxWidth = Math.min(width, 400);
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { coaches, classes, selectedCoachId, selectedClassId, timerSeconds, isLoading } = useApp();
+  const { coaches, classes, selectedCoachId, selectedClassId, timerSeconds, isLoading, streak: streakApi } = useApp();
+  const [streakUI, setStreakUI] = useState<StreakPublicState | null>(null);
+  const [showStreakSheet, setShowStreakSheet] = useState(false);
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
+
+  // pull announcements from context
+  const app = useApp();
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const s = await streakApi.getState();
+      if (mounted) setStreakUI(s);
+    })();
+    return () => { mounted = false; };
+  }, [streakApi]);
+
+  // Auto-show announcement on mount (if any queued)
+  useEffect(() => {
+    // when streakUI loaded and we have announcements, show the top one
+    if (streakUI && app.announcements && app.announcements.length > 0) {
+      setShowAnnouncement(true);
+    }
+  }, [streakUI, app.announcements]);
 
   const selectedCoach = coaches.find(c => c.id === selectedCoachId);
   const selectedClass = classes.find(c => c.id === selectedClassId);
@@ -43,6 +70,87 @@ export default function HomeScreen() {
   useEffect(() => {
     Asset.loadAsync(require('../../assets/images/THETA-BG.png'));
   }, []);
+
+  // streak variants
+  const streakCount = streakUI?.current ?? 0;
+  const isCompact = streakCount <= 3;
+  const isCounter = streakCount >= 4 && streakCount <= 6;
+  const isBig = streakCount >= 7;
+
+  // how many *contiguous* done days ending today (from last7 oldest->newest)
+  const tailFromEnd = React.useMemo(() => {
+    const days = streakUI?.last7 ?? [];
+    let cnt = 0;
+    for (let i = days.length - 1; i >= 0; i--) {
+      if (days[i].done) cnt++; else break;
+    }
+    return cnt;
+  }, [streakUI]);
+
+  // COMPACT CARD DATA (≤3)
+  // - window size: 3 for streak 1–2, 4 for streak == 3
+  // - lit = the contiguous tail (max 3) oldest->today
+  // - pad with future dim days to fill the window
+  const compactCardDays = React.useMemo(() => {
+    const windowSize = streakCount === 3 ? 4 : 3;
+    const litCount = Math.min(tailFromEnd, 3);
+    const days = streakUI?.last7 ?? [];
+
+    const toLabel = (isoKey: string) =>
+      new Date(isoKey).toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 3);
+
+    const litSlice = days.slice(-litCount); // oldest->today
+    const lit = litSlice.map(d => ({ label: toLabel(d.key), done: true }));
+
+    const todayISO = days[days.length - 1]?.key ?? null;
+    const todayDate = todayISO ? new Date(`${todayISO}T00:00:00`) : new Date();
+
+    const pads = Array.from({ length: Math.max(0, windowSize - lit.length) }).map((_, i) => {
+      const d = new Date(todayDate);
+      d.setDate(d.getDate() + (i + 1));
+      return {
+        label: d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 3),
+        done: false,
+      };
+    });
+
+    return [...lit, ...pads];
+  }, [streakUI, streakCount, tailFromEnd]);
+
+  // SHEET DATA: for <7, show 7 items total:
+  //  - earliest→today (lit, length = tailFromEnd)
+  //  - then pad with future days (dim) to reach 7
+  const sheetModeBig = streakCount >= 7;
+
+  const streakSheetDays = React.useMemo(() => {
+    if (!streakUI?.last7?.length || sheetModeBig) return [];
+
+    const days = streakUI.last7;                 // oldest -> newest
+    const take = Math.min(tailFromEnd, 7);       // lit tail length (ending today)
+    const litSlice = days.slice(-take);          // oldest -> today (lit)
+
+    const labelFromISO = (iso: string) =>
+      new Date(iso).toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 3);
+
+    const lit = litSlice.map(d => ({ label: labelFromISO(d.key), done: true }));
+
+    // pad with future days (dim) to make 7 total
+    const todayISO = days[days.length - 1]?.key;
+    const todayDate = todayISO ? new Date(`${todayISO}T00:00:00`) : new Date();
+    const padCount = 7 - lit.length;
+
+    const pads = Array.from({ length: Math.max(0, padCount) }).map((_, i) => {
+      const d = new Date(todayDate);
+      d.setDate(d.getDate() + (i + 1)); // next days after today
+      return {
+        label: d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 3),
+        done: false,
+      };
+    });
+
+    // final: 7 items, earliest→today lit first, then future dims
+    return [...lit, ...pads];
+  }, [streakUI, tailFromEnd, sheetModeBig]);
 
   if (isLoading) {
     return (
@@ -80,31 +188,49 @@ export default function HomeScreen() {
               </View>
 
               {/* Current Streak Card */}
-              <View style={styles.streakCard}>
-                <View style={styles.streakContent}>
-                  <View style={styles.streakLeft}>
-                    <Text style={styles.streakTitle}>Your Streak</Text>
-                    
-                    <View style={styles.daysContainer}>
-                      {['Mo', 'Tu', 'We', 'Th', 'Fr'].map((day, index) => (
-                        <View key={day} style={styles.dayItem}>
-                          <Image 
-                            source={require('../../assets/images/moon-icon.png')}
-                            style={styles.moonIcon}
-                          />
-                          <Text style={styles.dayText}>{day}</Text>
+              <TouchableOpacity activeOpacity={0.8} onPress={() => setShowStreakSheet(true)}>
+                <View style={styles.streakCard}>
+                  <View style={styles.streakContent}>
+                    <View style={styles.streakLeft}>
+                      <Text style={styles.streakTitle}>Your Streak</Text>
+
+                      {/* ≤3 days: compact row (today + next 2) */}
+                      {isCompact && (
+                        <View style={[styles.daysContainer, { justifyContent: 'flex-start', gap: 16 }]}>
+                          {compactCardDays.map((d, idx) => (
+                            <View key={`${d.label}-${idx}`} style={[styles.dayItem, { width: 'auto' }]}>
+                              <Image
+                                source={require('../../assets/images/moon-icon.png')}
+                                style={[styles.moonIcon, { opacity: d.done ? 1 : 0.3 }]}
+                              />
+                              <Text style={styles.dayText}>{d.label}</Text>
+                            </View>
+                          ))}
                         </View>
-                      ))}
+                      )}
+
+                      {/* 4–6 days: counter */}
+                      {isCounter && (
+                        <View style={{ paddingTop: 4 }}>
+                          <Text style={styles.streakCounterText}>{streakCount}-day streak</Text>
+                        </View>
+                      )}
+
+                      {/* 7+ days: big number */}
+                      {isBig && (
+                        <View style={{ paddingTop: 4 }}>
+                          <Text style={styles.streakBigText}>{streakCount} days</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={styles.streakRight}>
+                      {/* Evergreen message — no "X days to surprise" */}
+                      <Text style={styles.streakMessage}>Nice run — keep it going</Text>
                     </View>
                   </View>
-                  
-                  <View style={styles.streakRight}>
-                    <Text style={styles.streakMessage}>
-                      One more to unlock a new sleep task.
-                    </Text>
-                  </View>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               {/* Sleep Session */}
               <View style={styles.sessionSection}>
@@ -141,17 +267,42 @@ export default function HomeScreen() {
                     </View>
                   </View>
                 </View>
-              </View>
 
-              {/* Start Session */}
-              <View style={styles.startSession}>
-                <Text style={styles.startSessionText}>Start Session</Text>
-                <PlayButton onPress={handlePlayButtonPress} />
+                {/* Start Session */}
+                <View style={styles.startSession}>
+                  <Text style={styles.startSessionText}>Start Session</Text>
+                  <PlayButton onPress={handlePlayButtonPress} />
+                </View>
               </View>
             </View>
           </View>
         </SafeAreaView>
+        <DebugPanel />
       </View>
+
+      <StreakSheet
+        visible={showStreakSheet}
+        onClose={() => setShowStreakSheet(false)}
+        days={streakSheetDays}
+        currentStreak={streakCount}
+        bestStreak={streakUI?.best ?? 0}
+        mode={sheetModeBig ? 'big' : 'row'}
+      />
+
+      <AnnouncementSheet
+        visible={showAnnouncement && (app.announcements?.length ?? 0) > 0}
+        onClose={() => {
+          setShowAnnouncement(false);
+          app.shiftAnnouncement?.();
+        }}
+        variant={
+          app.announcements?.[0]
+            ? (app.announcements[0].type === 'reward_unlocked'
+                ? { type: 'reward_unlocked', streak: app.announcements[0].streak, rewardId: app.announcements[0].rewardId }
+                : { type: 'streak_plus', streak: app.announcements[0].streak })
+            : null
+        }
+      />
     </ErrorBoundary>
   );
 }
@@ -253,6 +404,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '300',
     textAlign: 'right',
+  },
+  streakCounterText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '300',
+  },
+  streakBigText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: '400',
   },
   sessionSection: {
     marginBottom: 12,

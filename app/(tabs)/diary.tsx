@@ -14,7 +14,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, G } from 'react-native-svg';
 import { RatingBottomSheet } from '../../components/RatingBottomSheet';
-import { supabase } from '../../lib/supabase';
+import { useApp } from '../../contexts/AppContext';
 
 const { width } = Dimensions.get('window');
 const maxWidth = Math.min(width, 400);
@@ -133,100 +133,39 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
 };
 
 export default function DiaryScreen() {
+  const { diary, rateDiaryEntry } = useApp();
   const [sheetVisible, setSheetVisible] = useState(false);
-  const [sheetDate, setSheetDate] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [diaryEntries, setDiaryEntries] = useState<any[]>([]);
+  const [sheetEntry, setSheetEntry] = useState<{ id: string; date: string } | null>(null);
   
   // Add month selector state
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  const fetchDiaryEntries = async () => {
-    try {
-      setLoading(true);
-      console.log('Fetching diary entries from session_complete table...');
+  // Convert diary -> UI model
+  const entries = diary.map(row => {
+    const d = new Date(`${row.dateKey}T00:00:00`);
+    const dateLabel = [
+      d.toLocaleDateString('en-GB', { weekday: 'short' }),
+      d.getDate(),
+      d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase(),
+    ].join(' ');
 
-      const { data, error } = await supabase
-        .from('session_complete')
-        .select('id, session_date, coach_name, class_name, rating')
-        .order('session_date', { ascending: false });
+    let statusText: string | null = null;
+    let statusColor: string | null = null;
+    if (row.rating === 'Good') { statusText = 'Good'; statusColor = '#4ADE80'; }
+    else if (row.rating === 'OK') { statusText = 'OK'; statusColor = '#60A5FA'; }
+    else if (row.rating === 'Poor') { statusText = 'Poor'; statusColor = '#F87171'; }
 
-      console.log('Supabase response:', { data, error });
-
-      if (error) {
-        console.error('Supabase error:', error);
-        setLoading(false);
-        return;
-      }
-
-      if (!data?.length) {
-        console.log('No data returned from database');
-        setDiaryEntries([]);
-        setLoading(false);
-        return;
-      }
-
-      console.log('Raw data from database:', data);
-      console.log('Number of entries:', data.length);
-
-      const formattedEntries = data.map(row => {
-        console.log('Processing entry:', row);
-        
-        const d = new Date(row.session_date);
-        const dateLabel = [
-          d.toLocaleDateString('en-US', { weekday: 'short' }),
-          d.getDate(),
-          d.toLocaleDateString('en-US', { month: 'short' }),
-        ].join(' ');
-
-        let isRateButton = false;
-        let statusColor: string|null = null;
-        let statusText: string|null = null;
-
-        if (!row.rating) {
-          isRateButton = true;
-        } else {
-          switch (row.rating) {
-            case 'Good':
-              statusText = 'Good';
-              statusColor = '#4ADE80';
-              break;
-            case 'OK':
-              statusText = 'OK';
-              statusColor = '#60A5FA';
-              break;
-            case 'Poor':
-              statusText = 'Poor';
-              statusColor = '#F87171';
-              break;
-            default:
-              isRateButton = true;
-          }
-        }
-
-        const formattedEntry = {
-          id: row.id,
-          date: dateLabel,
-          coach: row.coach_name,
-          level: row.class_name,
-          status: statusText,
-          statusColor,
-          isRateButton,
-          originalDate: row.session_date,
-        };
-        
-        console.log('Formatted entry:', formattedEntry);
-        return formattedEntry;
-      });
-
-      console.log('Final formatted entries:', formattedEntries);
-      setDiaryEntries(formattedEntries);
-    } catch (err) {
-      console.error('Error fetching diary entries:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    return {
+      id: row.id,
+      date: dateLabel,
+      coach: row.coachName,
+      level: row.className,
+      status: statusText,
+      statusColor,
+      isRateButton: row.rating === null,
+      originalDateKey: row.dateKey,
+    };
+  });
 
   // Month navigation logic
   const today = new Date();
@@ -253,8 +192,8 @@ export default function DiaryScreen() {
     .toUpperCase();
 
   // Filter entries for the selected month
-  const filteredEntries = diaryEntries.filter(entry => {
-    const d = new Date(entry.originalDate);
+  const filteredEntries = entries.filter(entry => {
+    const d = new Date(entry.originalDateKey);
     return (
       d.getFullYear() === selectedDate.getFullYear() &&
       d.getMonth() === selectedDate.getMonth()
@@ -297,72 +236,18 @@ export default function DiaryScreen() {
     ];
   }
 
-  useEffect(() => {
-    fetchDiaryEntries();
-    
-    // Force loading to false after 5 seconds to prevent infinite loading
-    const timeout = setTimeout(() => {
-      if (loading) {
-        console.log('Forcing loading to false after timeout');
-        setLoading(false);
-      }
-    }, 5000);
-    
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, []);
+  // No useEffect needed - data comes from context
 
-  function onPressRate(date: string) {
-    setSheetDate(date);
+  function onPressRate(entryId: string, dateLabel: string) {
+    setSheetEntry({ id: entryId, date: dateLabel });
     setSheetVisible(true);
   }
 
   async function handleSubmit(rating: 'Good' | 'OK' | 'Poor') {
-    const entryToUpdate = diaryEntries.find(entry => entry.date === sheetDate);
-
-    if (!entryToUpdate) {
-      console.error('No diary entry found for date:', sheetDate);
-      setSheetVisible(false);
-      return;
+    if (sheetEntry) {
+      await rateDiaryEntry(sheetEntry.id, rating);
     }
-
-    // Validate rating value
-    if (!['Good', 'OK', 'Poor'].includes(rating)) {
-      console.error('Invalid rating submitted:', rating);
-      setSheetVisible(false);
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('session_complete')
-        .update({ rating: rating }) // Send exact case to match DB constraint
-        .eq('id', entryToUpdate.id)
-        .select(); // fetch the updated row
-
-      if (error) {
-        console.error('Supabase error during update:', JSON.stringify(error, null, 2));
-      } else {
-        console.log('Successfully updated rating:', data);
-        fetchDiaryEntries();
-      }
-    } catch (err) {
-      console.error('Unexpected error updating rating:', err);
-    } finally {
-      setSheetVisible(false);
-    }
-  }
-
-  console.log('Diary render state:', { loading, diaryEntriesLength: diaryEntries.length });
-  
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="white" />
-        <Text style={styles.loadingText}>Loading diary entries...</Text>
-      </View>
-    );
+    setSheetVisible(false);
   }
 
   return (
@@ -442,7 +327,7 @@ export default function DiaryScreen() {
                             {entry.isRateButton ? (
                               <TouchableOpacity 
                                 style={styles.rateButton}
-                                onPress={() => onPressRate(entry.date)}
+                                onPress={() => onPressRate(entry.id, entry.date)}
                               >
                                 <Text style={styles.rateButtonText}>
                                   Rate
@@ -456,7 +341,7 @@ export default function DiaryScreen() {
                                 <View
                                   style={[
                                     styles.statusDot,
-                                    { backgroundColor: entry.statusColor },
+                                    { backgroundColor: entry.statusColor || 'transparent' },
                                   ]}
                                 />
                               </View>
@@ -480,7 +365,7 @@ export default function DiaryScreen() {
 
       <RatingBottomSheet
         visible={sheetVisible}
-        dateLabel={sheetDate}
+        dateLabel={sheetEntry?.date || ''}
         onClose={() => setSheetVisible(false)}
         onSubmit={handleSubmit}
       />
