@@ -97,7 +97,7 @@ export default function HomeScreen() {
     const days = streakUI?.last7 ?? [];
 
     const toLabel = (isoKey: string) =>
-      new Date(isoKey).toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 3);
+      new Date(isoKey).toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2);
 
     const litSlice = days.slice(-litCount); // oldest->today
     const lit = litSlice.map(d => ({ label: toLabel(d.key), done: true }));
@@ -109,7 +109,7 @@ export default function HomeScreen() {
       const d = new Date(todayDate);
       d.setDate(d.getDate() + (i + 1));
       return {
-        label: d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 3),
+        label: d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2),
         done: false,
       };
     });
@@ -130,7 +130,7 @@ export default function HomeScreen() {
     const litSlice = days.slice(-take);          // oldest -> today (lit)
 
     const labelFromISO = (iso: string) =>
-      new Date(iso).toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 3);
+      new Date(iso).toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2);
 
     const lit = litSlice.map(d => ({ label: labelFromISO(d.key), done: true }));
 
@@ -143,7 +143,7 @@ export default function HomeScreen() {
       const d = new Date(todayDate);
       d.setDate(d.getDate() + (i + 1)); // next days after today
       return {
-        label: d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 3),
+        label: d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2),
         done: false,
       };
     });
@@ -196,7 +196,7 @@ export default function HomeScreen() {
 
                       {/* ≤3 days: compact row (today + next 2) */}
                       {isCompact && (
-                        <View style={[styles.daysContainer, { justifyContent: 'flex-start', gap: 16 }]}>
+                        <View style={[styles.daysContainer, { justifyContent: 'flex-start', gap: 4 }]}>
                           {compactCardDays.map((d, idx) => (
                             <View key={`${d.label}-${idx}`} style={[styles.dayItem, { width: 'auto' }]}>
                               <Image
@@ -226,7 +226,7 @@ export default function HomeScreen() {
 
                     <View style={styles.streakRight}>
                       {/* Evergreen message — no "X days to surprise" */}
-                      <Text style={styles.streakMessage}>Nice run — keep it going</Text>
+                      <Text style={styles.streakMessage}>You're sleeping well, keep going!</Text>
                     </View>
                   </View>
                 </View>
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   streakTitle: {
     color: 'white',
     fontSize: 14,
-    fontWeight: '300',
+    fontWeight: '400',
     marginBottom: 12,
   },
   daysContainer: {
@@ -387,8 +387,8 @@ const styles = StyleSheet.create({
     width: '25%',
   },
   moonIcon: {
-    width: 24,
-    height: 24,
+    width: 36,
+    height: 36,
     marginBottom: 4,
   },
   dayText: {
@@ -401,7 +401,8 @@ const styles = StyleSheet.create({
   },
   streakMessage: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: '300',
     textAlign: 'right',
   },
