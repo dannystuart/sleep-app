@@ -1,14 +1,24 @@
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { useFonts, Dongle_400Regular } from '@expo-google-fonts/dongle';
+import { 
+  PlusJakartaSans_200ExtraLight,
+  PlusJakartaSans_300Light,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { enableScreens } from 'react-native-screens';
 import { View, ImageBackground, StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider } from '../contexts/AppContext';
+import { getStorageItem } from '../lib/storage';
 
 // Re-enable native screens so React Navigation can hide inactive tabs
 enableScreens();
@@ -24,14 +34,36 @@ declare global {
 
 export default function RootLayout() {
   useFrameworkReady();
+  const router = useRouter();
   
   const [fontsLoaded, fontError] = useFonts({
     'Dongle-Regular': Dongle_400Regular,
+    'PlusJakartaSans-ExtraLight': PlusJakartaSans_200ExtraLight,
+    'PlusJakartaSans-Light': PlusJakartaSans_300Light,
+    'PlusJakartaSans-Regular': PlusJakartaSans_400Regular,
+    'PlusJakartaSans-Medium': PlusJakartaSans_500Medium,
+    'PlusJakartaSans-SemiBold': PlusJakartaSans_600SemiBold,
+    'PlusJakartaSans-Bold': PlusJakartaSans_700Bold,
+    'PlusJakartaSans-ExtraBold': PlusJakartaSans_800ExtraBold,
   });
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
+
+      // decide onboarding vs home
+      (async () => {
+        if (__DEV__) {            // dev entry to quickly test onboarding
+          router.replace('/dev-gate');
+          return;
+        }
+        const has = await getStorageItem('hasOnboarded');
+        // Only redirect on very first app render; avoid loops by checking path?
+        // We are in the root layout before the stack mounts, so replace is fine.
+        if (!has || has === '') {
+          router.replace('/onboarding');
+        }
+      })();
     }
     window.frameworkReady?.();
   }, [fontsLoaded, fontError]);
@@ -77,6 +109,8 @@ export default function RootLayout() {
                 animation: 'none'
               }}>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'card', animation: 'fade' }} />
+                <Stack.Screen name="onboarding-coach" options={{ headerShown: false, presentation: "card", animation: "slide_from_right" }} />                <Stack.Screen name="dev-gate" options={{ headerShown: false, presentation: 'card', animation: 'fade' }} />
                 <Stack.Screen 
                   name="choose-coach" 
                   options={{ 

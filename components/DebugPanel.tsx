@@ -1,9 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useApp } from '../contexts/AppContext';
+import { setStorageItem } from '../lib/storage';
+import { useRouter } from 'expo-router';
 
 export const DebugPanel: React.FC = () => {
   const { diary, streak } = useApp();
+  const router = useRouter();
   const [streakData, setStreakData] = React.useState<any>(null);
 
   React.useEffect(() => {
@@ -67,6 +70,19 @@ export const DebugPanel: React.FC = () => {
             </Text>
           ))}
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🎯 Onboarding</Text>
+          <TouchableOpacity
+            onPress={async () => {
+              await setStorageItem('hasOnboarded', 'false');
+              router.replace('/onboarding');
+            }}
+            style={styles.debugButton}
+          >
+            <Text style={styles.debugButtonText}>Force Onboarding</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -106,5 +122,18 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 7,
     marginBottom: 1,
+  },
+  debugButton: {
+    backgroundColor: 'rgba(124, 58, 237, 0.8)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 2,
+  },
+  debugButtonText: {
+    color: 'white',
+    fontSize: 7,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 }); 

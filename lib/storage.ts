@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   streak: '@theta/streak',
   diary: '@theta/diary',
   announcements: '@theta/announcements',
+  hasOnboarded: '@theta/hasOnboarded',
 } as const;
 
 export type StorageKey = keyof typeof STORAGE_KEYS;

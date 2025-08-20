@@ -123,6 +123,29 @@ export default function SettingsScreen() {
                 </View>
               </TouchableOpacity>
             </View>
+
+            {/* Dev Section */}
+            {__DEV__ && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Development</Text>
+                <TouchableOpacity
+                  style={[styles.glassCard, { marginTop: 8 }]}
+                  onPress={async () => {
+                    try {
+                      const { setStorageItem } = await import('../../lib/storage');
+                      await setStorageItem('hasOnboarded', '');
+                      alert('Onboarding flag cleared. Use the dev-gate or restart to see onboarding.');
+                    } catch (error) {
+                      console.error('Error clearing onboarding flag:', error);
+                      alert('Error clearing onboarding flag. Please try again.');
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.className}>Reset onboarding (DEV)</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </SafeAreaView>
