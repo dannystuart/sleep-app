@@ -4,13 +4,22 @@ export interface Coach {
   locale?: string;
   style?: string;
   image_url: string;
+  sample_audio?: string;
   created_at?: string;
+  unlock_streak?: number; // Streak required to unlock this coach (0 or null = always available)
 }
+
+// Type alias for clarity in choose-coach screen
+export type CoachWithRequirement = Coach & {
+  streak_required?: number | null; // Alias for unlock_streak
+};
 
 export interface Class {
   id: string;
   name: string;
   tags: string[];
+  image_url?: string;
+  sample_audio?: string;
   created_at?: string;
 }
 
@@ -83,6 +92,17 @@ export interface AppContextType extends AppState {
   rateDiaryEntry: (id: string, rating: Exclude<DiaryRating, null>) => Promise<void>;
   announcements: any[];
   shiftAnnouncement: () => Promise<void>;
+  
+  // Coach unlock helpers
+  getNextCoachUnlock: (currentBest: number) => { milestone: number | null; daysToNext: number | null };
+  getNextCoachThreshold: (currentStreak: number) => { threshold: number | null; daysToNext: number | null; coachName: string | null };
+  isCoachUnlocked: (bestStreak: number, coach: Coach) => boolean;
+  
+  // DEV helpers
+  devPushAnnouncement?: (type: 'streak_plus' | 'reward_unlocked' | 'coach_unlocked', opts?: { streak?: number; rewardId?: string; coachId?: string; coachName?: string }) => Promise<void>;
+  testAnnouncement?: { type: 'streak_plus' | 'reward_unlocked'; streak: number; rewardId?: string } | null;
+  devShowTestAnnouncement?: (type: 'streak_plus' | 'reward_unlocked', opts?: { streak?: number; rewardId?: string }) => void;
+  devClearTestAnnouncement?: () => void;
 
   streak: {
     getState: () => Promise<StreakPublicState>;

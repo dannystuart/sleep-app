@@ -8,17 +8,21 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 export default function TabLayout() {
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Simple loading delay to ensure smooth transition
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 500);
+  const handleLoadingComplete = () => {
+    setIsLoading(false);
+  };
 
-    return () => clearTimeout(timer);
+  useEffect(() => {
+    // Let the LoadingSpinner control the duration
+    // The LoadingSpinner will call handleLoadingComplete when ready
   }, []);
 
   if (isLoading) {
-    return <LoadingSpinner message="Preparing your sleep app..." />;
+    return <LoadingSpinner 
+      message="Preparing your sleep app..." 
+      minDuration={4000}
+      onComplete={handleLoadingComplete}
+    />;
   }
 
   return (

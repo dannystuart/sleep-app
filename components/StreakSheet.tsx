@@ -4,6 +4,7 @@ import {
   TouchableOpacity, StyleSheet, View, Text, SafeAreaView, Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useApp } from '../contexts/AppContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.6;
@@ -22,6 +23,13 @@ export function StreakSheet({ visible, onClose, days, currentStreak, bestStreak,
   const [modalVisible, setModalVisible] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const sheetY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+  const { getNextCoachUnlock, getNextCoachThreshold } = useApp();
+
+  // Get next coach unlock info for UX copy (using actual coach data for more specific messaging)
+  const nextCoachThreshold = getNextCoachThreshold(currentStreak);
+  const coachUnlockText = nextCoachThreshold.daysToNext !== null && nextCoachThreshold.coachName
+    ? `Next coach unlock: ${nextCoachThreshold.coachName} in ${nextCoachThreshold.daysToNext} night${nextCoachThreshold.daysToNext === 1 ? '' : 's'}`
+    : 'All coaches unlocked!';
 
   useEffect(() => {
     if (visible) {
@@ -86,6 +94,11 @@ export function StreakSheet({ visible, onClose, days, currentStreak, bestStreak,
             <Text style={styles.motivationalText}>
               Keep building your streak to unlock more rewards.
             </Text>
+            
+            {/* Coach unlock progress */}
+            <Text style={styles.coachUnlockText}>
+              {coachUnlockText}
+            </Text>
 
             <TouchableOpacity onPress={onClose} activeOpacity={0.8} style={styles.doneWrapper}>
               <LinearGradient
@@ -136,5 +149,6 @@ const styles = StyleSheet.create({
   doneWrapper: { marginTop: 16, marginBottom: 32 },
   doneButton: { height: 64, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
   doneText: { color: 'white', fontSize: 16, fontWeight: '500' },
-  motivationalText: { color: 'white', fontSize: 14, textAlign: 'center', marginBottom: 24, fontWeight: '300', lineHeight: 20 },
+  motivationalText: { color: 'white', fontSize: 14, textAlign: 'center', marginBottom: 16, fontWeight: '300', lineHeight: 20 },
+  coachUnlockText: { color: 'rgba(249, 147, 151, 0.8)', fontSize: 12, textAlign: 'center', marginBottom: 24, fontWeight: '400', lineHeight: 16 },
 });

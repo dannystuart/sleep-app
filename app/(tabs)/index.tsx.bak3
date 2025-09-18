@@ -17,18 +17,13 @@ const maxWidth = Math.min(width, 400);
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { coaches, classes, selectedCoachId, selectedClassId, timerSeconds, isLoading, streak: streakApi, getNextCoachThreshold } = useApp();
+  const { coaches, classes, selectedCoachId, selectedClassId, timerSeconds, isLoading, streak: streakApi } = useApp();
   const [streakUI, setStreakUI] = useState<StreakPublicState | null>(null);
   const [showStreakSheet, setShowStreakSheet] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
 
   // pull announcements from context
   const app = useApp();
-  console.log('🔧 Home: State check', {
-    announcementsLength: app.announcements?.length,
-    showAnnouncement,
-    visible: showAnnouncement && (app.announcements?.length ?? 0) > 0
-  });
 
   useEffect(() => {
     let mounted = true;
@@ -41,41 +36,33 @@ export default function HomeScreen() {
 
   // Auto-show announcement on mount (if any queued)
   useEffect(() => {
-    console.log('🔧 Home: First useEffect triggered', { 
-      streakUILoaded: !!streakUI, 
-      announcementsLength: app.announcements?.length,
-      showAnnouncement 
-    });
     // when streakUI loaded and we have announcements, show the top one
     if (streakUI && app.announcements && app.announcements.length > 0) {
-      console.log('🔧 Home: Setting showAnnouncement to true (first effect)');
       setShowAnnouncement(true);
     }
   }, [streakUI, app.announcements]);
 
   // Also show announcements when they're added via debug panel (even if streakUI is already loaded)
   useEffect(() => {
-    console.log('🔧 Home: Second useEffect triggered', { 
-      announcementsLength: app.announcements?.length, 
-      showAnnouncement,
-      streakUILoaded: !!streakUI 
-    });
+    console.log('🔧 Debug: Announcements changed:', app.announcements?.length, 'showAnnouncement:', showAnnouncement);
     if (app.announcements && app.announcements.length > 0 && !showAnnouncement) {
-      console.log('🔧 Home: Setting showAnnouncement to true (second effect)');
+      console.log('🔧 Debug: Setting showAnnouncement to true');
       setShowAnnouncement(true);
     }
-  }, [app.announcements]);
+  }, [app.announcements, showAnnouncement]);
 
   // Show test announcements immediately when they are set
   useEffect(() => {
-    console.log('🔧 Home: Test announcement effect', { hasTest: !!app.testAnnouncement, showAnnouncement });
+    console.log('🔧 Home: Test announcement effect triggered', { 
+      testAnnouncement: app.testAnnouncement, 
+      showAnnouncement,
+      hasTestAnnouncement: !!app.testAnnouncement
+    });
     if (app.testAnnouncement && !showAnnouncement) {
-      console.log('🔧 Home: Test announcement detected, opening sheet');
+      console.log('🔧 Home: Test announcement detected, setting showAnnouncement to true');
       setShowAnnouncement(true);
     }
   }, [app.testAnnouncement, showAnnouncement]);
-
-
   const selectedCoach = coaches.find(c => c.id === selectedCoachId);
   const selectedClass = classes.find(c => c.id === selectedClassId);
 
@@ -124,12 +111,6 @@ export default function HomeScreen() {
   const hasActiveStreak = tailFromEnd > 0; // today is part of a contiguous tail
   const noStreakEver = !hasAnyPrevious;    // true for first-time users
   const streakFinished = !hasActiveStreak && hasAnyPrevious; // user had history but current streak is 0
-
-  // Get next coach unlock info for motivation
-  const nextCoachThreshold = getNextCoachThreshold(streakCount);
-  const coachMotivationText = nextCoachThreshold.daysToNext !== null && nextCoachThreshold.coachName
-    ? `Next coach unlock in ${nextCoachThreshold.daysToNext} night${nextCoachThreshold.daysToNext === 1 ? '' : 's'} (${nextCoachThreshold.coachName})`
-    : null;
 
   // how many *contiguous* done days ending today (from last7 oldest->newest)
   // (moved above for derived streak states)
@@ -284,11 +265,6 @@ export default function HomeScreen() {
                       ) : (
                         <Text style={styles.streakMessage}>You're sleeping well, keep going!</Text>
                       )}
-                      
-                      {/* Coach unlock motivation */}
-                      {coachMotivationText && (
-                        <Text style={styles.coachMotivation}>{coachMotivationText}</Text>
-                      )}
                     </View>
                   </View>
                 </View>
@@ -351,33 +327,29 @@ export default function HomeScreen() {
         mode={sheetModeBig ? 'big' : 'row'}
       />
 
-<AnnouncementSheet
-  visible={
-    (showAnnouncement && (app.announcements?.length ?? 0) > 0) ||
-    !!app.testAnnouncement
-  }
-  onClose={() => {
-    if (app.testAnnouncement) {
-      app.devClearTestAnnouncement?.();
-    } else {
-      setShowAnnouncement(false);
-      app.shiftAnnouncement?.();
-    }
-  }}
-  variant={
-    app.testAnnouncement
-      ? (app.testAnnouncement.type === 'reward_unlocked'
-          ? { type: 'reward_unlocked', streak: app.testAnnouncement.streak, rewardId: app.testAnnouncement.rewardId! }
-          : { type: 'streak_plus', streak: app.testAnnouncement.streak })
-      : app.announcements?.[0]
-        ? (app.announcements[0].type === 'reward_unlocked'
-            ? { type: 'reward_unlocked', streak: app.announcements[0].streak, rewardId: app.announcements[0].rewardId }
-            : app.announcements[0].type === 'coach_unlocked'
-            ? { type: 'coach_unlocked', streak: app.announcements[0].streak, coachId: app.announcements[0].coachId, coachName: app.announcements[0].coachName }
-            : { type: 'streak_plus', streak: app.announcements[0].streak })
-        : null
-  }
-/>
+      <AnnouncementSheet
+        visible={showAnnouncement && ((app.announcements?.length ?? 0) > 0 || !!app.testAnnouncement)}
+        onClose={() => {
+          setShowAnnouncement(false);
+          if (app.testAnnouncement) {
+            // Clear test announcement
+            app.devClearTestAnnouncement?.();
+          } else {
+            app.shiftAnnouncement?.();
+          }
+        }}
+        variant={
+          app.testAnnouncement
+            ? (app.testAnnouncement.type === 'reward_unlocked'
+                ? { type: 'reward_unlocked' as const, streak: app.testAnnouncement.streak, rewardId: app.testAnnouncement.rewardId! }
+                : { type: 'streak_plus' as const, streak: app.testAnnouncement.streak })
+            : app.announcements?.[0]
+            ? (app.announcements[0].type === 'reward_unlocked'
+                ? { type: 'reward_unlocked' as const, streak: app.announcements[0].streak, rewardId: app.announcements[0].rewardId }
+                : { type: 'streak_plus' as const, streak: app.announcements[0].streak })
+            : null
+        }
+      />
     </ErrorBoundary>
   );
 }
@@ -480,15 +452,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '300',
     textAlign: 'right',
-  },
-  coachMotivation: {
-    color: 'rgba(249, 147, 151, 0.8)',
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '400',
-    textAlign: 'right',
-    marginTop: 8,
-    fontStyle: 'italic',
   },
   streakCounterText: {
     color: 'white',

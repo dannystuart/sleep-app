@@ -3,9 +3,10 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useApp } from '../contexts/AppContext';
 import { setStorageItem } from '../lib/storage';
 import { useRouter } from 'expo-router';
+import type { DiaryEntry } from '../types';
 
 export const DebugPanel: React.FC = () => {
-  const { diary, streak } = useApp();
+  const { diary, streak, devPushAnnouncement, devShowTestAnnouncement, announcements, coaches } = useApp() as any;
   const router = useRouter();
   const [streakData, setStreakData] = React.useState<any>(null);
 
@@ -17,6 +18,15 @@ export const DebugPanel: React.FC = () => {
     };
     loadStreak();
   }, [streak]);
+
+  // Debug: Check if functions are available
+  React.useEffect(() => {
+    console.log('🔧 Debug Panel - Available functions:', {
+      devShowTestAnnouncement: typeof devShowTestAnnouncement,
+      devPushAnnouncement: typeof devPushAnnouncement,
+      announcements: announcements?.length
+    });
+  }, [devShowTestAnnouncement, devPushAnnouncement, announcements]);
 
   return (
     <View style={styles.container}>
@@ -64,7 +74,7 @@ export const DebugPanel: React.FC = () => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📝 Diary Entries ({diary.length})</Text>
-          {diary.slice(0, 5).map((entry, index) => (
+          {diary.slice(0, 5).map((entry: DiaryEntry, index: number) => (
             <Text key={index} style={styles.text}>
               {entry.dateKey}: {entry.coachName} - {entry.className} ({entry.rating || 'Not rated'})
             </Text>
@@ -83,6 +93,80 @@ export const DebugPanel: React.FC = () => {
             <Text style={styles.debugButtonText}>Force Onboarding</Text>
           </TouchableOpacity>
         </View>
+
+        <View style={styles.section}>
+  <Text style={styles.sectionTitle}>📣 Test Announcements</Text>
+  <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+    <Text
+      style={[styles.text, { textDecorationLine: 'underline', marginRight: 6 }]}
+      onPress={() => {
+        console.log('🔧 Debug: Forcing Test Streak +1');
+        devShowTestAnnouncement?.('streak_plus', {
+          streak: (streakData?.current ?? 0) + 1,
+        });
+      }}
+    >
+      Test Streak +1
+    </Text>
+    <Text
+      style={[styles.text, { textDecorationLine: 'underline' }]}
+      onPress={() => {
+        console.log('🔧 Debug: Forcing Test Reward');
+        devShowTestAnnouncement?.('reward_unlocked', {
+          rewardId: 'moon.crescent',
+          streak: streakData?.current ?? 1,
+        });
+      }}
+    >
+      Test Reward
+    </Text>
+  </View>
+</View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📣 Announcement Sheets</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            <Text
+              style={[styles.text, { textDecorationLine: 'underline', marginRight: 6 }]}
+              onPress={async () => {
+                console.log('🔧 Debug: Creating streak_plus announcement');
+                await devPushAnnouncement?.('streak_plus', { streak: (streakData?.current ?? 0) + 1 });
+                console.log('🔧 Debug: Announcement created');
+                router.replace('/');
+              }}
+            >
+              Show Streak +1
+            </Text>
+            <Text
+              style={[styles.text, { textDecorationLine: 'underline', marginRight: 6 }]}
+              onPress={async () => {
+                console.log('🔧 Debug: Creating reward_unlocked announcement');
+                await devPushAnnouncement?.('reward_unlocked', { rewardId: 'moon.crescent', streak: streakData?.current ?? 1 });
+                console.log('🔧 Debug: Announcement created');
+                router.replace('/');
+              }}
+            >
+              Show Reward
+            </Text>
+            <Text
+              style={[styles.text, { textDecorationLine: 'underline' }]}
+              onPress={async () => {
+                console.log('🔧 Debug: Creating coach_unlocked announcement');
+                // Use the second coach (Michael) with proper coachId
+                const testCoach = coaches?.[1] || { id: 'coach-2', name: 'Michael' };
+                await devPushAnnouncement?.('coach_unlocked', { 
+                  streak: streakData?.current ?? 3, 
+                  coachId: testCoach.id,
+                  coachName: testCoach.name 
+                });
+                console.log('🔧 Debug: Coach unlock announcement created for:', testCoach.name);
+                router.replace('/');
+              }}
+            >
+              Show Coach Unlock
+            </Text>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -91,14 +175,14 @@ export const DebugPanel: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 20,
+    top: 20,
     right: 10,
     width: 180,
     maxHeight: 200,
     backgroundColor: 'rgba(0,0,0,0.7)',
     borderRadius: 8,
     padding: 8,
-    zIndex: 1000,
+    zIndex: 2000,
   },
   title: {
     color: 'white',
@@ -136,4 +220,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-}); 
+});

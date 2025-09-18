@@ -6,24 +6,6 @@ import { AppContextType, AppState, Coach, Class, SessionAudio, SessionEvent, Dia
 // UUID helper function
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-// Coach unlock milestones for UX copy (e.g., "Next coach unlock in N nights")
-// Actual unlock logic reads each coach's own unlock_streak field
-export const COACH_UNLOCK_MILESTONES = [3, 6, 8, 10];
-
-// Pure helper to determine if a coach is unlocked based on best streak
-// unlock_streak null/0 means always unlocked; otherwise best >= unlock_streak
-export function isCoachUnlocked(bestStreak: number, coach: Coach): boolean {
-  const unlockRequirement = coach.unlock_streak;
-  
-  // null or 0 means always unlocked (starter coaches)
-  if (!unlockRequirement || unlockRequirement === 0) {
-    return true;
-  }
-  
-  // Otherwise, best streak must meet or exceed requirement
-  return bestStreak >= unlockRequirement;
-}
-
 // UK date helpers
 const UK_TZ = 'Europe/London';
 const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: UK_TZ, year:'numeric', month:'2-digit', day:'2-digit' });
@@ -72,8 +54,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ===== Announcements (queued to show on next app open) =====
   type Announcement =
     | { id: string; type: 'streak_plus'; createdAt: string; streak: number }
-    | { id: string; type: 'reward_unlocked'; createdAt: string; streak: number; rewardId: string }
-    | { id: string; type: 'coach_unlocked'; createdAt: string; streak: number; coachId: string; coachName: string };
+    | { id: string; type: 'reward_unlocked'; createdAt: string; streak: number; rewardId: string };
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   
@@ -107,8 +88,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             locale: 'British',
             style: 'Smooth & Calm',
             image_url: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400',
-            created_at: new Date().toISOString(),
-            unlock_streak: 0 // Starter coach - always available
+            created_at: new Date().toISOString()
           },
           {
             id: 'coach-2',
@@ -116,35 +96,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             locale: 'American',
             style: 'Deep & Soothing',
             image_url: 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=400',
-            created_at: new Date().toISOString(),
-            unlock_streak: 3 // Unlocked at 3-day streak
-          },
-          {
-            id: 'coach-3',
-            name: 'Emma',
-            locale: 'Australian',
-            style: 'Gentle & Warm',
-            image_url: 'https://images.pexels.com/photos/2379006/pexels-photo-2379006.jpeg?auto=compress&cs=tinysrgb&w=400',
-            created_at: new Date().toISOString(),
-            unlock_streak: 6 // Unlocked at 6-day streak
-          },
-          {
-            id: 'coach-4',
-            name: 'James',
-            locale: 'Canadian',
-            style: 'Rich & Resonant',
-            image_url: 'https://images.pexels.com/photos/2379007/pexels-photo-2379007.jpeg?auto=compress&cs=tinysrgb&w=400',
-            created_at: new Date().toISOString(),
-            unlock_streak: 8 // Unlocked at 8-day streak
-          },
-          {
-            id: 'coach-5',
-            name: 'Sophia',
-            locale: 'Irish',
-            style: 'Melodic & Peaceful',
-            image_url: 'https://images.pexels.com/photos/2379008/pexels-photo-2379008.jpeg?auto=compress&cs=tinysrgb&w=400',
-            created_at: new Date().toISOString(),
-            unlock_streak: 10 // Unlocked at 10-day streak
+            created_at: new Date().toISOString()
           }
         ];
       }
@@ -240,31 +192,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.error('Error parsing stored announcements:', error);
         }
       }
-
-      // Debug log to verify coaches have unlock_streak values
-      console.log('🎯 Coaches loaded with unlock requirements:', coaches.map(c => ({ 
-        id: c.id, 
-        name: c.name, 
-        unlock_streak: c.unlock_streak 
-      })));
-
-      // Test the isCoachUnlocked helper with various combinations
-      console.log('🧪 Testing isCoachUnlocked helper:');
-      const testCases = [
-        { best: 2, coach: coaches.find(c => c.unlock_streak === 3) }, // Should be false
-        { best: 3, coach: coaches.find(c => c.unlock_streak === 3) }, // Should be true  
-        { best: 10, coach: coaches.find(c => c.unlock_streak === 0) }, // Should be true
-        { best: 1, coach: coaches.find(c => c.unlock_streak === 0) }, // Should be true
-        { best: 5, coach: coaches.find(c => c.unlock_streak === 6) }, // Should be false
-        { best: 8, coach: coaches.find(c => c.unlock_streak === 6) }, // Should be true
-      ];
-      
-      testCases.forEach(({ best, coach }, index) => {
-        if (coach) {
-          const result = isCoachUnlocked(best, coach);
-          console.log(`  Test ${index + 1}: best=${best}, unlock=${coach.unlock_streak}, coach=${coach.name} → ${result}`);
-        }
-      });
 
       setState({
         coaches,
@@ -411,29 +338,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // DEV helper: enqueue a test announcement so AnnouncementSheet pops on Home
   async function devPushAnnouncement(
-    type: 'streak_plus' | 'reward_unlocked' | 'coach_unlocked',
-    opts?: { streak?: number; rewardId?: string; coachId?: string; coachName?: string }
+    type: 'streak_plus' | 'reward_unlocked',
+    opts?: { streak?: number; rewardId?: string }
   ) {
     const s = opts?.streak ?? streak.current;
     const base = { id: uid(), createdAt: new Date().toISOString(), streak: s } as const;
-    
-    let a: Announcement;
-    if (type === 'streak_plus') {
-      a = { ...base, type: 'streak_plus' };
-    } else if (type === 'reward_unlocked') {
-      a = { ...base, type: 'reward_unlocked', rewardId: opts?.rewardId ?? 'bg.glow1' };
-    } else {
-      // coach_unlocked
-      a = { 
-        ...base, 
-        type: 'coach_unlocked', 
-        coachId: opts?.coachId ?? state.coaches[1]?.id ?? 'coach-2',
-        coachName: opts?.coachName ?? state.coaches[1]?.name ?? 'Michael'
-      };
-    }
+    const a =
+      type === 'streak_plus'
+        ? ({ ...base, type: 'streak_plus' } as const)
+        : ({ ...base, type: 'reward_unlocked', rewardId: opts?.rewardId ?? 'bg.glow1' } as const);
 
-    console.log('devPushAnnouncement ->', a);
-    await pushAnnouncement(a);
+    await pushAnnouncement(a as any);
   }
 
   // DEV helper: directly show a test announcement (for debug panel)
@@ -441,17 +356,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     type: 'streak_plus' | 'reward_unlocked',
     opts?: { streak?: number; rewardId?: string }
   ) {
-    console.log('🔧 Context: devShowTestAnnouncement called', { type, opts });
     const s = opts?.streak ?? streak.current;
-    const newAnnouncement = {
+    setTestAnnouncement({
       type,
       streak: s,
       rewardId: type === 'reward_unlocked' ? (opts?.rewardId ?? 'bg.glow1') : undefined
-    };
-    console.log('🔧 Context: Setting testAnnouncement to:', newAnnouncement);
-    setTestAnnouncement(newAnnouncement);
-    console.log('🔧 Context: testAnnouncement state should be updated');
+    });
   }
+
   // DEV helper: clear test announcement
   function devClearTestAnnouncement() {
     setTestAnnouncement(null);
@@ -498,9 +410,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       best: streak.best 
     });
     
-    // Capture best streak before mutation for coach unlock detection
-    const bestBefore = streak.best;
-    
     let next = { ...streak };
 
     console.log('🧪 TEST_MODE:', TEST_MODE);
@@ -542,36 +451,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     await saveStreak(next);
 
-    // Get best streak after mutation for coach unlock detection
-    const bestAfter = next.best;
-
-    // Check for newly unlocked coaches
-    const newlyUnlocked = state.coaches.filter(coach => {
-      const unlockReq = coach.unlock_streak;
-      // Only consider coaches with unlock requirements > 0
-      if (!unlockReq || unlockReq === 0) return false;
-      // Coach is newly unlocked if: bestBefore < unlock_streak <= bestAfter
-      return bestBefore < unlockReq && unlockReq <= bestAfter;
-    });
-
-    console.log('🎯 Coach unlock check:', { bestBefore, bestAfter, newlyUnlocked: newlyUnlocked.map(c => ({ name: c.name, unlock: c.unlock_streak })) });
-
-    // Announcement priority: coach unlock > reward unlock > streak plus
-    if (newlyUnlocked.length > 0) {
-      // Option B: Announce the highest unlocked coach only
-      const highestUnlocked = newlyUnlocked.sort((a, b) => (b.unlock_streak || 0) - (a.unlock_streak || 0))[0];
-      console.log('🎉 Coach unlocked:', highestUnlocked.name, 'at streak', bestAfter);
-      
-      await pushAnnouncement({
-        id: uid(),
-        type: 'coach_unlocked',
-        createdAt: new Date().toISOString(),
-        streak: bestAfter,
-        coachId: highestUnlocked.id,
-        coachName: highestUnlocked.name,
-      });
-    } else if (rewardId) {
-      // Reward announcement enqueue
+    // Reward announcement enqueue (MVP: show ONE thing next open)
+    if (rewardId) {
       await pushAnnouncement({
         id: uid(),
         type: 'reward_unlocked',
@@ -580,7 +461,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         rewardId,
       });
     } else {
-      // Default streak plus announcement
       await pushAnnouncement({
         id: uid(),
         type: 'streak_plus',
@@ -626,39 +506,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }
 
-  // Get next coach unlock milestone for UX copy
-  function getNextCoachUnlock(currentBest: number): { milestone: number | null; daysToNext: number | null } {
-    const nextMilestone = COACH_UNLOCK_MILESTONES.find(m => m > currentBest) ?? null;
-    const daysToNext = nextMilestone ? Math.max(0, nextMilestone - currentBest) : null;
-    console.log('🎯 Next coach unlock calculation:', { currentBest, milestones: COACH_UNLOCK_MILESTONES, nextMilestone, daysToNext });
-    return { milestone: nextMilestone, daysToNext };
-  }
-
-  // Get next coach unlock threshold from actual coach data
-  function getNextCoachThreshold(currentStreak: number): { threshold: number | null; daysToNext: number | null; coachName: string | null } {
-    // Find coaches with unlock requirements > current streak, ignoring 0
-    const lockedCoaches = state.coaches
-      .filter(coach => {
-        const req = coach.unlock_streak;
-        return req && req > 0 && req > currentStreak;
-      })
-      .sort((a, b) => (a.unlock_streak || 0) - (b.unlock_streak || 0));
-
-    const nextCoach = lockedCoaches[0];
-    if (!nextCoach || !nextCoach.unlock_streak) {
-      return { threshold: null, daysToNext: null, coachName: null };
-    }
-
-    const daysToNext = Math.max(0, nextCoach.unlock_streak - currentStreak);
-    console.log('🎯 Next coach threshold calculation:', { currentStreak, nextCoach: nextCoach.name, threshold: nextCoach.unlock_streak, daysToNext });
-    
-    return { 
-      threshold: nextCoach.unlock_streak, 
-      daysToNext, 
-      coachName: nextCoach.name 
-    };
-  }
-
   // Test function to manually increment streak
   async function testIncrementStreak() {
     console.log('🧪 Manual streak increment test');
@@ -695,9 +542,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // DEV helper to clear streak
   async function devResetStreak() {
-    const next = { ...streak, current: 0, best: 0, lastDateKey: '', sessionsByDate: {} as Record<string, true> };
+    const next = { ...streak, current: 0, lastDateKey: '', sessionsByDate: {} as Record<string, true> };
     await saveStreak(next);
-    console.log('🧪 devResetStreak -> cleared streak state (including best)');
+    console.log('🧪 devResetStreak -> cleared streak state');
   }
 
   const logEvent = async (event: Omit<SessionEvent, 'id' | 'occurred_at'>) => {
@@ -720,17 +567,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     rateDiaryEntry,
     announcements,
     shiftAnnouncement,
-    devPushAnnouncement,
-    testAnnouncement,              // expose live test announcement state
-    devShowTestAnnouncement,       // show once (debug)
-    devClearTestAnnouncement,      // clear it
-    getNextCoachUnlock,            // get next coach unlock milestone for UX copy
-    getNextCoachThreshold,         // get next coach unlock threshold from actual coaches
-    isCoachUnlocked, // coach unlock helper
+    devPushAnnouncement, // ⬅️ expose dev helper
+    testAnnouncement, // ⬅️ expose test announcement state
+    devShowTestAnnouncement, // ⬅️ expose test announcement trigger
+    devClearTestAnnouncement, // ⬅️ expose clear test announcement
     streak: {
       getState: getStreakState,
       onSessionComplete,
-      testIncrementStreak,
+      testIncrementStreak, // Add test function
       devSetStreakDays,
       devResetStreak,
     },

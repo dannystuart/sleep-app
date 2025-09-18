@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from '../components/SafeAreaView';
@@ -10,15 +10,44 @@ const maxWidth = Math.min(width, 400);
 
 export default function ChooseCoachScreen() {
   const router = useRouter();
-  const { coaches, selectedCoachId, setCoach } = useApp();
+  const { coaches, selectedCoachId, setCoach, streak } = useApp();
   const [tempSelectedCoachId, setTempSelectedCoachId] = useState(selectedCoachId);
+  const [bestStreak, setBestStreak] = useState<number>(0);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const s = await streak.getState?.();
+        if (alive) setBestStreak(s?.best ?? 0);
+      } catch (err) {
+        console.warn('Failed to load best streak', err);
+        if (alive) setBestStreak(0);
+      }
+    })();
+    return () => { alive = false; };
+  }, [streak]);
+
+  // treat null/undefined as 0 to keep old rows visible at start
+  const unlockedCoaches = useMemo(
+    () => (coaches ?? []).filter(c => (c.unlock_streak ?? 0) <= bestStreak),
+    [coaches, bestStreak]
+  );
+
+  useEffect(() => {
+    if (!unlockedCoaches?.length) return;
+    const stillVisible = unlockedCoaches.some(c => c.id === tempSelectedCoachId);
+    if (!stillVisible) {
+      setTempSelectedCoachId(unlockedCoaches[0].id);
+    }
+  }, [unlockedCoaches, tempSelectedCoachId]);
 
   const handleCoachSelect = (coachId: string) => {
     setTempSelectedCoachId(coachId);
   };
 
   const handleBackPress = async () => {
-    if (tempSelectedCoachId !== selectedCoachId) {
+    if (unlockedCoaches.length > 0 && tempSelectedCoachId !== selectedCoachId) {
       await setCoach(tempSelectedCoachId);
     }
     router.back();
@@ -58,11 +87,18 @@ export default function ChooseCoachScreen() {
 
           {/* Coaches List */}
           <FlatList
-            data={coaches}
+            data={unlockedCoaches}
             renderItem={renderCoach}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={{ paddingTop: 24, alignItems: 'center' }}>
+                <Text style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  No coaches unlocked yet.
+                </Text>
+              </View>
+            }
           />
         </View>
       </SafeAreaView>
