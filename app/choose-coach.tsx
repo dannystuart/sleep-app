@@ -134,6 +134,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 20,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
   placeholder: {
     width: 40,
@@ -174,10 +175,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '400',
     marginBottom: 4,
+    fontFamily: 'DMSans',
   },
   coachDetails: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
 }); 

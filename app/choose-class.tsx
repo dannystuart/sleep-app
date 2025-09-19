@@ -135,6 +135,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '400',
+    fontFamily: 'DMSans',
   },
   spacer: {
     width: 40,
@@ -175,6 +176,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
   subButtonsGrid: {
     flexDirection: 'row',
@@ -196,6 +198,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
   instructionText: {
     color: 'white',
@@ -203,6 +206,7 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     textAlign: 'center',
     marginBottom: 24,
+    fontFamily: 'DMSans',
   },
   individualClassesGrid: {
     flexDirection: 'row',
@@ -228,5 +232,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
 }); 

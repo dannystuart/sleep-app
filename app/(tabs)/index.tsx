@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Asset } from 'expo-asset';
 import ErrorBoundary from '../../components/ErrorBoundary';
@@ -198,20 +198,6 @@ export default function HomeScreen() {
     // final: 7 items, earliest→today lit first, then future dims
     return [...lit, ...pads];
   }, [streakUI, tailFromEnd, sheetModeBig]);
-
-  if (isLoading) {
-    return (
-      <View style={styles.screenContainer}>
-        <SafeAreaView style={styles.container}>
-          <View style={[styles.mobileContainer, { maxWidth }]}>
-            <View style={styles.content}>
-              <ActivityIndicator size="large" color="#F99393" />
-            </View>
-          </View>
-        </SafeAreaView>
-      </View>
-    );
-  }
 
   return (
     <ErrorBoundary>
@@ -451,6 +437,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     marginBottom: 12,
+    fontFamily: 'DMSans',
   },
   daysContainer: {
     flexDirection: 'row',
@@ -469,6 +456,7 @@ const styles = StyleSheet.create({
   dayText: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 12,
+    fontFamily: 'DMSans',
   },
   streakRight: {
     flex: 1,
@@ -480,6 +468,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '300',
     textAlign: 'right',
+    fontFamily: 'DMSans',
   },
   coachMotivation: {
     color: 'rgba(249, 147, 151, 0.8)',
@@ -489,16 +478,19 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 8,
     fontStyle: 'italic',
+    fontFamily: 'DMSans',
   },
   streakCounterText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
   streakBigText: {
     color: 'white',
     fontSize: 24,
     fontWeight: '400',
+    fontFamily: 'DMSans',
   },
   sessionSection: {
     marginBottom: 12,
@@ -509,6 +501,7 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     textAlign: 'center',
     marginBottom: 24,
+    fontFamily: 'DMSans',
   },
   cardsGrid: {
     flexDirection: 'row',
@@ -549,11 +542,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '300',
     marginBottom: 12,
+    fontFamily: 'DMSans',
   },
   cardSubtitle: {
     color: 'white',
     fontSize: 14,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
   coachImageContainer: {
     borderRadius: 12,
@@ -573,5 +568,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '400',
+    fontFamily: 'DMSans',
   },
 });

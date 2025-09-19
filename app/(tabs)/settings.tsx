@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from '../../components/SafeAreaView';
 import { ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -52,20 +52,6 @@ export default function SettingsScreen() {
   const handleTimerPress = () => {
     router.push('/sleep-timer');
   };
-
-  if (isLoading) {
-    return (
-      <View style={styles.screenContainer}>
-        <SafeAreaView style={styles.container}>
-          <View style={[styles.mobileContainer, { maxWidth }]}>
-            <View style={styles.content}>
-              <ActivityIndicator size="large" color="#F99393" />
-            </View>
-          </View>
-        </SafeAreaView>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.screenContainer}>
@@ -134,7 +120,8 @@ export default function SettingsScreen() {
                     try {
                       const { setStorageItem } = await import('../../lib/storage');
                       await setStorageItem('hasOnboarded', '');
-                      alert('Onboarding flag cleared. Use the dev-gate or restart to see onboarding.');
+                      console.log('🔄 Onboarding flag cleared, navigating to onboarding...');
+                      router.replace('/onboarding');
                     } catch (error) {
                       console.error('Error clearing onboarding flag:', error);
                       alert('Error clearing onboarding flag. Please try again.');
@@ -177,6 +164,7 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     textAlign: 'center',
     marginBottom: 40,
+    fontFamily: 'DMSans',
   },
   section: {
     marginBottom: 32,
@@ -186,6 +174,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     marginBottom: 16,
+    fontFamily: 'DMSans',
   },
   glassCard: {
     backgroundColor: 'rgba(121, 75, 214, 0.1)',
@@ -214,6 +203,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
   classContent: {
     gap: 16,
@@ -227,6 +217,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -245,6 +236,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
   timerDescription: {
     color: 'rgba(255, 255, 255, 0.7)',
@@ -252,6 +244,7 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     marginBottom: 16,
     lineHeight: 20,
+    fontFamily: 'DMSans',
   },
   timerRow: {
     flexDirection: 'row',
@@ -262,5 +255,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
 });

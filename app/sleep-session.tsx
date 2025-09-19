@@ -34,7 +34,7 @@ export default function SleepSessionScreen() {
   if (isLoading || !coach || !cls) {
     return (
       <View style={{flex:1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center'}}>
-        <Text style={{color: 'white', fontSize: 18}}>Loading session...</Text>
+        <Text style={{color: 'white', fontSize: 18, fontFamily: 'DMSans'}}>Loading session...</Text>
       </View>
     );
   }
@@ -395,7 +395,7 @@ export default function SleepSessionScreen() {
         </View>
 
         {/* TEST BUTTON - Remove this after testing */}
-        <View style={styles.testSection}>
+        {/* <View style={styles.testSection}>
           <TouchableOpacity 
             style={styles.testButton}
             onPress={() => {
@@ -432,7 +432,7 @@ export default function SleepSessionScreen() {
           >
             <Text style={styles.testButtonText}>🧪 Direct Session Complete</Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
       </SafeAreaView>
     </View>
   );
@@ -457,7 +457,8 @@ const styles = StyleSheet.create({
   title: {
     color: 'white', 
     fontSize: 20, 
-    fontWeight: '300'
+    fontWeight: '300',
+    fontFamily: 'DMSans'
   },
   profileSection: {
     alignItems: 'center',
@@ -492,6 +493,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: 'DMSans',
   },
   classCard: {
     flexDirection: 'row',
@@ -515,12 +517,14 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '400',
+    fontFamily: 'DMSans',
   },
 
   classCardTitle: {
     color: 'white',
     fontSize: 20,
     fontWeight: '400',
+    fontFamily: 'DMSans',
   },
 
   durationSection: {
@@ -536,6 +540,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '400',
+    fontFamily: 'DMSans',
   },
   playButtonSection: {
     alignItems: 'center',
@@ -594,6 +599,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     marginTop: 0,
+    fontFamily: 'DMSans',
   },
   progressTimer: {
     flexDirection: 'row',
@@ -601,27 +607,26 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   fullText: {
-
     color: 'white', 
     textAlign: 'center',
     fontSize: 14,
     marginTop: 0,
-
+    fontFamily: 'DMSans',
   },
-  testSection: {
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  testButton: {
-    backgroundColor: '#FF6B6B',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  testButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  // testSection: {
+  //   alignItems: 'center',
+  //   marginTop: 20,
+  // },
+  // testButton: {
+  //   backgroundColor: '#FF6B6B',
+  //   paddingHorizontal: 20,
+  //   paddingVertical: 12,
+  //   borderRadius: 8,
+  // },
+  // testButtonText: {
+  //   color: 'white',
+  //   fontSize: 14,
+  //   fontWeight: '600',
+  // },
 
 }); 

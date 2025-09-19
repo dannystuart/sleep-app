@@ -94,9 +94,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supabase.from('session_audio').select('*'),
       ]);
 
-      let coaches = coachesResult.data || [];
-      let classes = classesResult.data || [];
-      let sessionAudio = sessionAudioResult.data || [];
+      let coaches: Coach[] = coachesResult.data || [];
+      let classes: Class[] = classesResult.data || [];
+      let sessionAudio: SessionAudio[] = sessionAudioResult.data || [];
+
+      console.log('🔧 AppContext: Database coaches loaded:', coaches.length);
+      console.log('🔧 AppContext: First coach unlock_card:', coaches[0]?.unlock_card);
+      console.log('🔧 AppContext: Coaches (first 5) unlock_card hosts:', (coaches || []).slice(0,5).map(c => ({ name: c.name, host: (() => { try { const u = new URL(String(c.unlock_card||'')); return u.host; } catch { return null; } })() })));
 
       // Fallback mock data if database is empty
       if (coaches.length === 0) {
@@ -117,7 +121,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             style: 'Deep & Soothing',
             image_url: 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=400',
             created_at: new Date().toISOString(),
-            unlock_streak: 3 // Unlocked at 3-day streak
+            unlock_streak: 3, // Unlocked at 3-day streak
+            unlock_card: 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=600&h=800' // Test unlock card - different size
           },
           {
             id: 'coach-3',
@@ -126,7 +131,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             style: 'Gentle & Warm',
             image_url: 'https://images.pexels.com/photos/2379006/pexels-photo-2379006.jpeg?auto=compress&cs=tinysrgb&w=400',
             created_at: new Date().toISOString(),
-            unlock_streak: 6 // Unlocked at 6-day streak
+            unlock_streak: 6, // Unlocked at 6-day streak
+            unlock_card: 'https://images.pexels.com/photos/2379006/pexels-photo-2379006.jpeg?auto=compress&cs=tinysrgb&w=400' // Test unlock card
           },
           {
             id: 'coach-4',
@@ -135,7 +141,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             style: 'Rich & Resonant',
             image_url: 'https://images.pexels.com/photos/2379007/pexels-photo-2379007.jpeg?auto=compress&cs=tinysrgb&w=400',
             created_at: new Date().toISOString(),
-            unlock_streak: 8 // Unlocked at 8-day streak
+            unlock_streak: 8, // Unlocked at 8-day streak
+            unlock_card: 'https://images.pexels.com/photos/2379007/pexels-photo-2379007.jpeg?auto=compress&cs=tinysrgb&w=400' // Test unlock card
           },
           {
             id: 'coach-5',
@@ -144,7 +151,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             style: 'Melodic & Peaceful',
             image_url: 'https://images.pexels.com/photos/2379008/pexels-photo-2379008.jpeg?auto=compress&cs=tinysrgb&w=400',
             created_at: new Date().toISOString(),
-            unlock_streak: 10 // Unlocked at 10-day streak
+            unlock_streak: 10, // Unlocked at 10-day streak
+            unlock_card: 'https://images.pexels.com/photos/2379008/pexels-photo-2379008.jpeg?auto=compress&cs=tinysrgb&w=400' // Test unlock card
           }
         ];
       }
@@ -169,7 +177,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             tags: ['Memory'],
             created_at: new Date().toISOString()
           }
-        ];
+        ] as Class[];
       }
 
       if (sessionAudio.length === 0) {
@@ -180,10 +188,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             id: `audio-${coach.id}-${cls.id}`,
             coach_id: coach.id,
             class_id: cls.id,
-            audio_url: null, // No audio URL for mock data
+            audio_url: '', // No audio URL for mock data
             created_at: new Date().toISOString()
           }))
-        );
+        ) as SessionAudio[];
       }
 
       // 2. Load stored selections and local data
@@ -423,13 +431,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else if (type === 'reward_unlocked') {
       a = { ...base, type: 'reward_unlocked', rewardId: opts?.rewardId ?? 'bg.glow1' };
     } else {
-      // coach_unlocked
-      a = { 
-        ...base, 
-        type: 'coach_unlocked', 
-        coachId: opts?.coachId ?? state.coaches[1]?.id ?? 'coach-2',
-        coachName: opts?.coachName ?? state.coaches[1]?.name ?? 'Michael'
+      // coach_unlocked — pick strictly by the streak unless "forceCoach" is true
+      const targetStreak = base.streak;
+      const byStreak = state.coaches.find(c => Number(c.unlock_streak) === Number(targetStreak));
+
+      // Optional: allow an explicit override only if a flag is set
+      const forceCoach = (opts as any)?.forceCoach === true;
+
+      const chosen = forceCoach
+        ? state.coaches.find(c => String(c.id) === String(opts?.coachId)) || byStreak || state.coaches[0]
+        : byStreak || state.coaches[0];
+
+      a = {
+        ...base,
+        type: 'coach_unlocked',
+        coachId: String(chosen?.id || ''),
+        coachName: String(chosen?.name || 'Unknown'),
       };
+
+      console.log('🔧 devPushAnnouncement: chosen coach for unlock', {
+        streak: targetStreak,
+        chosen: {
+          id: chosen?.id,
+          name: chosen?.name,
+          unlock_streak: chosen?.unlock_streak,
+          unlock_card: chosen?.unlock_card,
+        },
+        overrideUsed: forceCoach,
+      });
     }
 
     console.log('devPushAnnouncement ->', a);
@@ -702,7 +731,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logEvent = async (event: Omit<SessionEvent, 'id' | 'occurred_at'>) => {
     try {
-      await supabase.from('session_events').insert([event]);
+      await supabase.from('session_events').insert([event] as any);
     } catch (error) {
       console.error('Error logging event:', error);
     }

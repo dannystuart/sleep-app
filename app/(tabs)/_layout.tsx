@@ -4,23 +4,28 @@ import CustomBottomNavigation from '../../components/CustomBottomNavigation';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useApp } from '../../contexts/AppContext';
 
 export default function TabLayout() {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isUILoading, setIsUILoading] = useState(true);
+  const { isLoading: isDataLoading } = useApp();
 
   const handleLoadingComplete = () => {
-    setIsLoading(false);
+    setIsUILoading(false);
   };
+
+  // Only show the app when both UI loading is complete AND data is ready
+  const shouldShowApp = !isUILoading && !isDataLoading;
 
   useEffect(() => {
     // Let the LoadingSpinner control the duration
     // The LoadingSpinner will call handleLoadingComplete when ready
   }, []);
 
-  if (isLoading) {
+  if (!shouldShowApp) {
     return <LoadingSpinner 
       message="Preparing your sleep app..." 
-      minDuration={4000}
+      minDuration={2000} // Reduced minimum duration since we're waiting for real data
       onComplete={handleLoadingComplete}
     />;
   }

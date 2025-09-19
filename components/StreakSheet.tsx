@@ -92,13 +92,9 @@ export function StreakSheet({ visible, onClose, days, currentStreak, bestStreak,
 
             {/* Motivational text above button */}
             <Text style={styles.motivationalText}>
-              Keep building your streak to unlock more rewards.
+              Keep building your streak to unlock new coaches.
             </Text>
             
-            {/* Coach unlock progress */}
-            <Text style={styles.coachUnlockText}>
-              {coachUnlockText}
-            </Text>
 
             <TouchableOpacity onPress={onClose} activeOpacity={0.8} style={styles.doneWrapper}>
               <LinearGradient
@@ -122,13 +118,13 @@ const styles = StyleSheet.create({
   sheetWrapper: { position: 'absolute', left: 0, right: 0, bottom: 0, height: SHEET_HEIGHT },
   sheet: { flex: 1, backgroundColor: '#15131A', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   inner: { flex: 1, paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24 },
-  title: { color: 'white', fontSize: 18, textAlign: 'center', marginBottom: 20, fontWeight: '300' },
-  sub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center', marginBottom: 20 },
+  title: { color: 'white', fontSize: 24, textAlign: 'center', marginBottom: 20, fontWeight: '500', fontFamily: 'DMSans' },
+  sub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center', marginBottom: 20, fontFamily: 'DMSans' },
   
   // Big mode styles
   bigMoon: { width: 80, height: 80, marginBottom: 16, alignSelf: 'center' },
-  bigStreakCount: { color: 'white', fontSize: 32, textAlign: 'center', marginBottom: 8, fontWeight: '600' },
-  bestStreak: { color: 'white', fontSize: 14, textAlign: 'center', marginBottom: 24, fontWeight: '300' },
+  bigStreakCount: { color: 'white', fontSize: 32, textAlign: 'center', marginBottom: 8, fontWeight: '600', fontFamily: 'DMSans' },
+  bestStreak: { color: 'white', fontSize: 14, textAlign: 'center', marginBottom: 24, fontWeight: '300', fontFamily: 'DMSans' },
   
   // Row mode styles
   streakInfo: { alignItems: 'center', marginBottom: 24 },
@@ -141,14 +137,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8, 
     marginBottom: 8 
   },
-  currentStreakText: { color: 'white', fontSize: 16, fontWeight: '500' },
-  daysRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+  currentStreakText: { color: 'white', fontSize: 16, fontWeight: '500', fontFamily: 'DMSans' },
+  daysRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 48 },
   day: { alignItems: 'center', width: '14.2%' },
   moon: { width: 32, height: 32, marginBottom: 4 },
-  dayText: { color: 'white', fontSize: 12, fontWeight: '300' },
-  doneWrapper: { marginTop: 16, marginBottom: 32 },
+  dayText: { color: 'white', fontSize: 12, fontWeight: '300', fontFamily: 'DMSans' },
+  doneWrapper: { 
+    position: 'absolute', 
+    bottom: 24, 
+    left: 24, 
+    right: 24 
+  },
   doneButton: { height: 64, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
-  doneText: { color: 'white', fontSize: 16, fontWeight: '500' },
-  motivationalText: { color: 'white', fontSize: 14, textAlign: 'center', marginBottom: 16, fontWeight: '300', lineHeight: 20 },
-  coachUnlockText: { color: 'rgba(249, 147, 151, 0.8)', fontSize: 12, textAlign: 'center', marginBottom: 24, fontWeight: '400', lineHeight: 16 },
+  doneText: { color: 'white', fontSize: 16, fontWeight: '500', fontFamily: 'DMSans' },
+  motivationalText: { color: 'white', fontSize: 18, textAlign: 'center', marginBottom: 16, fontWeight: '300', lineHeight: 24, fontFamily: 'DMSans' },
+  coachUnlockText: { color: 'rgba(249, 147, 151, 0.8)', fontSize: 12, textAlign: 'center', marginBottom: 24, fontWeight: '400', lineHeight: 16, fontFamily: 'DMSans' },
 });

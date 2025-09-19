@@ -7,6 +7,7 @@ export interface Coach {
   sample_audio?: string;
   created_at?: string;
   unlock_streak?: number; // Streak required to unlock this coach (0 or null = always available)
+  unlock_card?: string; // URL to unlock card image for coaches unlocked at later streak levels
 }
 
 // Type alias for clarity in choose-coach screen

@@ -399,6 +399,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     marginTop: 10,
+    fontFamily: 'DMSans',
   },
   emptyState: {
     flex: 1,
@@ -411,11 +412,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     marginBottom: 8,
+    fontFamily: 'DMSans',
   },
   emptyStateSubtext: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
     textAlign: 'center',
+    fontFamily: 'DMSans',
   },
 
   //////////////////////////////////////////////////////
@@ -435,6 +438,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '300',
     marginBottom: 24,
+    fontFamily: 'DMSans',
   },
 
   //////////////////////////////////////////////////////
@@ -461,6 +465,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '300',
     letterSpacing: 6,
+    fontFamily: 'DMSans',
   },
 
   //////////////////////////////////////////////////////
@@ -487,6 +492,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '300',
     marginBottom: 16,
+    fontFamily: 'DMSans',
   },
 
   //////////////////////////////////////////////////////
@@ -517,11 +523,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '300',
     marginBottom: 12,
+    fontFamily: 'DMSans',
   },
   levelText: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
   entryRight: {
     alignItems: 'flex-end',
@@ -535,6 +543,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '300',
     marginRight: 8,
+    fontFamily: 'DMSans',
   },
   statusDot: {
     width: 12,
@@ -551,6 +560,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
 
   //////////////////////////////////////////////////////
@@ -580,5 +590,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
 });

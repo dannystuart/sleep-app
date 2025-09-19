@@ -183,12 +183,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 16,
+    fontFamily: 'DMSans',
   },
   prompt: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 36,
+    fontFamily: 'DMSans',
   },
   option: {
     flexDirection: 'row',
@@ -203,6 +205,7 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 16,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
   dot: {
     width: 16, height: 16, borderRadius: 8,
@@ -215,6 +218,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   doneText: {
-    color: 'white', fontSize: 16, fontWeight: '500',
+    color: 'white', fontSize: 16, fontWeight: '500', fontFamily: 'DMSans',
   },
 }); 

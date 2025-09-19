@@ -12,6 +12,12 @@ import {
   PlusJakartaSans_700Bold,
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
+import {
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_600SemiBold,
+  DMSans_700Bold,
+} from '@expo-google-fonts/dm-sans';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { enableScreens } from 'react-native-screens';
@@ -37,7 +43,7 @@ export default function RootLayout() {
   const router = useRouter();
   
   const [fontsLoaded, fontError] = useFonts({
-    'Dongle-Regular': Dongle_400Regular,
+    // Onboarding fonts (Plus Jakarta Sans)
     'PlusJakartaSans-ExtraLight': PlusJakartaSans_200ExtraLight,
     'PlusJakartaSans-Light': PlusJakartaSans_300Light,
     'PlusJakartaSans-Regular': PlusJakartaSans_400Regular,
@@ -45,6 +51,12 @@ export default function RootLayout() {
     'PlusJakartaSans-SemiBold': PlusJakartaSans_600SemiBold,
     'PlusJakartaSans-Bold': PlusJakartaSans_700Bold,
     'PlusJakartaSans-ExtraBold': PlusJakartaSans_800ExtraBold,
+    
+    // Main app font (DM Sans) - single family with weight support
+    'DMSans': DMSans_400Regular,
+    
+    // Legacy fonts
+    'Dongle-Regular': Dongle_400Regular,
   });
 
   useEffect(() => {
@@ -53,10 +65,6 @@ export default function RootLayout() {
 
       // decide onboarding vs home
       (async () => {
-        if (__DEV__) {            // dev entry to quickly test onboarding
-          router.replace('/dev-gate');
-          return;
-        }
         const has = await getStorageItem('hasOnboarded');
         // Only redirect on very first app render; avoid loops by checking path?
         // We are in the root layout before the stack mounts, so replace is fine.
@@ -110,7 +118,7 @@ export default function RootLayout() {
               }}>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'card', animation: 'fade' }} />
-                <Stack.Screen name="onboarding-coach" options={{ headerShown: false, presentation: "card", animation: "slide_from_right" }} />                <Stack.Screen name="dev-gate" options={{ headerShown: false, presentation: 'card', animation: 'fade' }} />
+                <Stack.Screen name="onboarding-coach" options={{ headerShown: false, presentation: "card", animation: "slide_from_right" }} />
                 <Stack.Screen 
                   name="choose-coach" 
                   options={{ 

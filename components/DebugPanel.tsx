@@ -152,14 +152,10 @@ export const DebugPanel: React.FC = () => {
               style={[styles.text, { textDecorationLine: 'underline' }]}
               onPress={async () => {
                 console.log('🔧 Debug: Creating coach_unlocked announcement');
-                // Use the second coach (Michael) with proper coachId
-                const testCoach = coaches?.[1] || { id: 'coach-2', name: 'Michael' };
                 await devPushAnnouncement?.('coach_unlocked', { 
-                  streak: streakData?.current ?? 3, 
-                  coachId: testCoach.id,
-                  coachName: testCoach.name 
+                  streak: streakData?.current ?? 3
                 });
-                console.log('🔧 Debug: Coach unlock announcement created for:', testCoach.name);
+                console.log('🔧 Debug: Coach unlock announcement created');
                 router.replace('/');
               }}
             >

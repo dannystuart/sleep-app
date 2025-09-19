@@ -9,6 +9,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo-google-fonts/dongle": "^0.4.0",
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.1",
     "@expo/vector-icons": "^14.1.0",
@@ -24,7 +25,7 @@
     "expo-constants": "~17.1.7",
     "expo-font": "^13.0.3",
     "expo-haptics": "~14.1.4",
-    "expo-linear-gradient": "~14.1.5",
+    "expo-linear-gradient": "^15.0.7",
     "expo-linking": "~7.1.7",
     "expo-router": "~5.1.4",
     "expo-splash-screen": "~0.30.10",

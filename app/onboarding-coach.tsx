@@ -50,7 +50,7 @@ export default function OnboardingCoach() {
   }, [streak]);
 
   const unlockedCoaches = useMemo(
-    () => (coaches ?? []).filter(c => (c.unlock_streak ?? 0) <= bestStreak),
+    () => (coaches ?? []).filter((c: any) => (c.unlock_streak ?? 0) <= bestStreak),
     [coaches, bestStreak]
   );
 
@@ -350,7 +350,7 @@ export default function OnboardingCoach() {
         <View style={styles.carouselWrapper}>
           <PanGestureHandler onGestureEvent={gestureHandler}>
             <Animated.View style={[styles.carousel, carouselStyle]}>
-              {unlockedCoaches.map((coach, index) => {
+              {unlockedCoaches.map((coach: any, index: number) => {
                 // Calculate the position of this card relative to the viewport center
                 const cardLeft = CARD_MARGIN_H + index * STEP; // actual left edge including the first margin
 
@@ -512,7 +512,7 @@ export default function OnboardingCoach() {
 
         {/* Navigation Dots */}
         <View style={styles.dotsContainer}>
-          {unlockedCoaches.map((_, index) => (
+          {unlockedCoaches.map((_: any, index: number) => (
             <View
               key={index}
               style={[

@@ -99,6 +99,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 20,
     fontWeight: '300',
+    fontFamily: 'DMSans',
   },
   placeholder: {
     width: 40,
@@ -109,6 +110,7 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     marginBottom: 24,
     lineHeight: 20,
+    fontFamily: 'DMSans',
   },
   listContainer: {
     paddingBottom: 20,
@@ -135,5 +137,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '400',
+    fontFamily: 'DMSans',
   },
 }); 
