@@ -16,7 +16,7 @@ import { useApp } from '../contexts/AppContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import LottieView from 'lottie-react-native';
-import { Audio } from 'expo-av';
+import { AudioPlayer, AudioSource, useAudioPlayer } from 'expo-audio';
 import { setStorageItem } from '../lib/storage';
 
 
@@ -58,7 +58,8 @@ export default function OnboardingCoach() {
   const translateX = useSharedValue(0);
 
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const [currentAudioUri, setCurrentAudioUri] = useState<string | null>(null);
+  const player = useAudioPlayer(currentAudioUri as AudioSource);
   const stopTimeoutRef = useRef<number | null>(null);
   const lottieOpacity = useSharedValue(0);
   const playButtonOpacity = useSharedValue(1);
@@ -100,25 +101,13 @@ export default function OnboardingCoach() {
         clearTimeout(stopTimeoutRef.current);
         stopTimeoutRef.current = null;
       }
-      const s = soundRef.current;
-      if (!s) return;
-      // fade over ~300ms
-      const steps = 6;
-      const stepDur = 50;
-      const status = await s.getStatusAsync();
-      if (!('volume' in status)) return;
-      let vol = (status as any).volume ?? 1;
-      for (let i = 0; i < steps; i++) {
-        vol = Math.max(0, vol - 1 / steps);
-        await s.setVolumeAsync(vol);
-        await new Promise(r => setTimeout(r, stepDur));
-      }
-      await s.stopAsync();
-      await s.unloadAsync();
+      if (!player) return;
+      // expo-audio doesn't have volume control, so just stop
+      player.pause();
     } catch (e) {
       // no-op
     } finally {
-      soundRef.current = null;
+      setCurrentAudioUri(null);
       setPlayingIndex(null);
     }
   };
@@ -127,7 +116,7 @@ export default function OnboardingCoach() {
     // Fade out Lottie animation
     lottieOpacity.value = withTiming(0, { duration: 200 });
     
-    if (soundRef.current) {
+    if (currentAudioUri) {
       await fadeOutAndStop();
     } else {
       setPlayingIndex(null);
@@ -181,8 +170,8 @@ export default function OnboardingCoach() {
         console.log('🎵 Using test audio URL for debugging');
         const testUri = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
         
-        const { sound } = await Audio.Sound.createAsync({ uri: testUri }, { shouldPlay: true, volume: 1, isLooping: false });
-        soundRef.current = sound;
+        setCurrentAudioUri(testUri);
+        player.play();
         console.log('✅ Test audio started playing');
 
         // stop after 5 seconds with fadeout
@@ -193,8 +182,8 @@ export default function OnboardingCoach() {
       }
 
       console.log('🎵 Loading audio from:', uri);
-      const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true, volume: 1, isLooping: false });
-      soundRef.current = sound;
+      setCurrentAudioUri(uri);
+      player.play();
       console.log('✅ Audio started playing');
 
       // stop after 5 seconds with fadeout
@@ -271,18 +260,7 @@ export default function OnboardingCoach() {
 
   // Set audio mode for iOS silent mode playback
   React.useEffect(() => {
-    (async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          allowsRecordingIOS: false,
-          staysActiveInBackground: false,
-          interruptionModeIOS: 1,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-        });
-      } catch {}
-    })();
+    // Audio mode configuration not needed with expo-audio
   }, []);
 
   // Cleanup on unmount

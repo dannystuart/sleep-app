@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Asset } from 'expo-asset';
-import { Audio } from 'expo-av';
+import { AudioPlayer, AudioSource, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from '../components/SafeAreaView';
 import { useApp } from '../contexts/AppContext';
@@ -44,12 +44,12 @@ export default function SleepSessionScreen() {
   const hasAudio = audioUrl && !audioUrl.includes('example.com');
 
   const bgOpacity = useRef(new Animated.Value(0)).current;
-  const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
-  const [audioPosition, setAudioPosition] = useState(0);
-  const [length, setLength] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const soundRef = useRef<Audio.Sound|null>(null);
+  
+  // expo-audio player
+  const player = useAudioPlayer(audioUrl as AudioSource);
+  const status = useAudioPlayerStatus(player);
   const timerRef = useRef<ReturnType<typeof setInterval>|null>(null);
   const sessionEndTime = useRef<number>(0);
   const pausedAtTime = useRef<number>(0);
@@ -119,14 +119,7 @@ export default function SleepSessionScreen() {
         timer_seconds: timerSeconds,
       }).catch(() => {});
       
-      // 2. Configure audio mode
-      await Audio.setAudioModeAsync({
-        staysActiveInBackground: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-      });
-      
-      // 3. Check if audio URL is valid
+      // 2. Check if audio URL is valid
       if (!hasAudio) {
         console.warn('🔇 No audio available for this coach+class combination, running timer-only session');
         // Start timer without audio
@@ -136,15 +129,11 @@ export default function SleepSessionScreen() {
         return;
       }
       
-      // 4. Load & play the single MP3
+      // 3. Load & play the single MP3
       console.log('🎵 Loading audio:', audioUrl);
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
-        { shouldPlay: true }
-      );
-      soundRef.current = sound;
-      sound.setOnPlaybackStatusUpdate(onPlaybackStatus);
-      setIsPlaying(true);
+      if (player) {
+        player.play();
+      }
       
       // 5. Start countdown timer
       sessionEndTime.current = Date.now() + timerSeconds * 60_000;
@@ -158,14 +147,10 @@ export default function SleepSessionScreen() {
     }
   };
 
-  // Playback status handler - updates UI but does not load another sound
-  const onPlaybackStatus = (status: any) => {
-    if (!status.isLoaded) return;
-    setLength(status.durationMillis || length);
-    setIsPlaying(status.isPlaying);
-    setIsPaused(status.isPaused || !status.isPlaying);
-    setAudioPosition(status.positionMillis || 0);
-  };
+  // Get audio status from expo-audio
+  const isPlaying = status?.playing ?? false;
+  const audioPosition = (status?.currentTime ?? 0) * 1000; // Convert seconds to milliseconds
+  const length = (status?.duration ?? 0) * 1000; // Convert seconds to milliseconds
 
   // Finish & cleanup when timer ends
   const finishSession = async () => {
@@ -209,22 +194,24 @@ export default function SleepSessionScreen() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    soundRef.current?.unloadAsync().catch(console.error);
+    if (player) {
+      player.pause();
+    }
   };
 
   // Play/Pause toggle
   const togglePlay = () => {
-    if (!soundRef.current) {
+    if (!player) {
       console.warn('No audio available to play');
       return;
     }
     
     if (isPlaying) {
-      soundRef.current.pauseAsync();
+      player.pause();
       setIsPaused(true);
       pauseTimer();
     } else {
-      soundRef.current.playAsync();
+      player.play();
       setIsPaused(false);
       resumeTimer();
     }
@@ -287,11 +274,10 @@ export default function SleepSessionScreen() {
 
   // Seek functionality
   const seekTo = (seekPercentage: number) => {
-    if (!soundRef.current || !length) return;
+    if (!player || !length) return;
     
     const seekTime = (seekPercentage / 100) * length;
-    soundRef.current.setPositionAsync(seekTime);
-    setAudioPosition(seekTime);
+    player.seekTo(seekTime / 1000); // Convert milliseconds to seconds
     // Don't update session position - that should continue based on real time
   };
 
@@ -359,8 +345,8 @@ export default function SleepSessionScreen() {
           <TouchableOpacity 
             activeOpacity={0.8} 
             onPress={togglePlay}
-            disabled={!hasAudio || !soundRef.current}
-            style={(!hasAudio || !soundRef.current) && styles.playButtonDisabled}
+            disabled={!hasAudio || !player}
+            style={(!hasAudio || !player) && styles.playButtonDisabled}
           >
             <LinearGradient
               colors={isPlaying ? ['#413A6D', '#221D55'] : ['#B3ACE9', '#5B45DD']}

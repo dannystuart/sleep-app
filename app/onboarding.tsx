@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ImageBackground, Platform, TouchableOpacity, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -41,8 +41,8 @@ const FONTS = {
 
 export default function Onboarding() {
   const router = useRouter();
-  const videoRef = React.useRef<Video>(null);
-  const video2Ref = React.useRef<Video>(null);
+  const videoPlayer = useVideoPlayer(require('../assets/video/Orb-1.mp4'));
+  const video2Player = useVideoPlayer(require('../assets/video/Orb-2.mp4'));
   const [tapImageReady, setTapImageReady] = React.useState(false);
   const [calmBrainAnimationCompleted, setCalmBrainAnimationCompleted] = React.useState(false);
   const [videoTransitionStarted, setVideoTransitionStarted] = React.useState(false);
@@ -77,9 +77,7 @@ export default function Onboarding() {
     
     // Start playing the second video
     setTimeout(() => {
-      if (video2Ref.current) {
-        video2Ref.current.playAsync().catch(error => console.log('Video 2 play error:', error));
-      }
+      video2Player.play();
     }, 400); // Start playing halfway through the transition
     
     // Start the calm brain text animation sequence only if it hasn't been completed
@@ -344,13 +342,9 @@ export default function Onboarding() {
       // Start playing video after a short delay to ensure it's ready
       setTimeout(() => {
         try {
-          if (videoRef.current) {
-            videoRef.current.playAsync().catch(error => {
-              console.log('Video play error:', error);
-            });
-          }
+          videoPlayer.play();
         } catch (error) {
-          console.log('Video ref error:', error);
+          console.log('Video play error:', error);
         }
       }, 100); // 100ms delay
     }, DUR.hold1 + DUR.fade + DUR.hold2 + DUR.fade + DUR.slide + 1000 + 1000); // Extra 1 second hold
@@ -429,12 +423,11 @@ export default function Onboarding() {
       clearTimeout(finalElementsTimer);
       
       // Clean up video when component unmounts
-      if (videoRef.current) {
-        try {
-          videoRef.current.stopAsync();
-        } catch (error) {
-          console.log('Video stop error:', error);
-        }
+      try {
+        videoPlayer.pause();
+        video2Player.pause();
+      } catch (error) {
+        console.log('Video stop error:', error);
       }
     };
   }, []);
@@ -446,31 +439,23 @@ export default function Onboarding() {
       
       {/* Video Layer 1 - Orb-1.mp4 */}
       <Animated.View style={[styles.videoContainer, videoStyle]}>
-        <Video
-          ref={videoRef}
-          source={require('../assets/video/Orb-1.mp4')}
+        <VideoView
+          player={videoPlayer}
           style={styles.video}
-          shouldPlay={false}
-          isLooping={true}
-          isMuted={true}
-          resizeMode={ResizeMode.COVER}
-          onLoad={() => console.log('Video 1 loaded successfully')}
-          onError={(error) => console.log('Video 1 load error:', error)}
+          allowsFullscreen={false}
+          allowsPictureInPicture={false}
+          contentFit="cover"
         />
       </Animated.View>
       
       {/* Video Layer 2 - Orb-2.mp4 */}
       <Animated.View style={[styles.videoContainer, video2Style]}>
-        <Video
-          ref={video2Ref}
-          source={require('../assets/video/Orb-2.mp4')}
+        <VideoView
+          player={video2Player}
           style={styles.video}
-          shouldPlay={false}
-          isLooping={true}
-          isMuted={true}
-          resizeMode={ResizeMode.COVER}
-          onLoad={() => console.log('Video 2 loaded successfully')}
-          onError={(error) => console.log('Video 2 load error:', error)}
+          allowsFullscreen={false}
+          allowsPictureInPicture={false}
+          contentFit="cover"
         />
       </Animated.View>
       
