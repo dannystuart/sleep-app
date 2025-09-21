@@ -5,8 +5,12 @@ import { setStorageItem } from '../lib/storage';
 import { useRouter } from 'expo-router';
 import type { DiaryEntry } from '../types';
 
-export const DebugPanel: React.FC = () => {
-  const { diary, streak, devPushAnnouncement, devShowTestAnnouncement, announcements, coaches } = useApp() as any;
+interface DebugPanelProps {
+  onClose?: () => void;
+}
+
+export const DebugPanel: React.FC<DebugPanelProps> = ({ onClose }) => {
+  const { diary, streak, devPushAnnouncement, devShowTestAnnouncement, announcements, coaches, scheduleDailyReminder, scheduleBedtimeReminder, scheduleMorningReminder, scheduleAllDailyNotifications, cancelAllLocalReminders, ensureLocalNotifPermission } = useApp() as any;
   const router = useRouter();
   const [streakData, setStreakData] = React.useState<any>(null);
 
@@ -30,7 +34,14 @@ export const DebugPanel: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🔧 Debug Panel</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>🔧 Debug Panel</Text>
+        {onClose && (
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Text style={styles.closeButtonText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       
       <ScrollView style={styles.scrollView}>
         {/* Streak Controls */}
@@ -163,6 +174,78 @@ export const DebugPanel: React.FC = () => {
             </Text>
           </View>
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔔 Local Notifications</Text>
+          <TouchableOpacity
+            onPress={async () => {
+              const { fireLocalTestNotification } = await import('../lib/localTestNotification');
+              await fireLocalTestNotification();
+              console.log('✅ Local notification scheduled (fires in 5s)');
+            }}
+            style={styles.debugButton}
+          >
+            <Text style={styles.debugButtonText}>Test (5s)</Text>
+          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2 }}>
+            <Text
+              style={[styles.text, { textDecorationLine: 'underline', marginRight: 6 }]}
+              onPress={async () => {
+                await scheduleBedtimeReminder();
+                console.log('✅ Bedtime reminder scheduled for 10:00 PM');
+              }}
+            >
+              Bedtime 22:00
+            </Text>
+            <Text
+              style={[styles.text, { textDecorationLine: 'underline', marginRight: 6 }]}
+              onPress={async () => {
+                await scheduleMorningReminder();
+                console.log('✅ Morning reminder scheduled for 8:00 AM');
+              }}
+            >
+              Morning 08:00
+            </Text>
+            <Text
+              style={[styles.text, { textDecorationLine: 'underline', marginRight: 6 }]}
+              onPress={async () => {
+                await scheduleDailyReminder(22, 30);
+                console.log('✅ Daily reminder scheduled for 10:30 PM');
+              }}
+            >
+              Daily 22:30
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2 }}>
+            <Text
+              style={[styles.text, { textDecorationLine: 'underline', marginRight: 6 }]}
+              onPress={async () => {
+                const results = await scheduleAllDailyNotifications();
+                console.log('✅ All daily notifications scheduled:', results);
+              }}
+            >
+              Schedule All
+            </Text>
+            <Text
+              style={[styles.text, { textDecorationLine: 'underline', marginRight: 6 }]}
+              onPress={async () => {
+                await cancelAllLocalReminders();
+                console.log('✅ All local reminders cancelled');
+              }}
+            >
+              Cancel All
+            </Text>
+            <Text
+              style={[styles.text, { textDecorationLine: 'underline' }]}
+              onPress={async () => {
+                const granted = await ensureLocalNotifPermission();
+                console.log('✅ Notification permission:', granted ? 'Granted' : 'Denied');
+              }}
+            >
+              Check Perms
+            </Text>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -180,11 +263,29 @@ const styles = StyleSheet.create({
     padding: 8,
     zIndex: 2000,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   title: {
     color: 'white',
     fontSize: 10,
     fontWeight: 'bold',
-    marginBottom: 4,
+  },
+  closeButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   scrollView: {
     maxHeight: 150,

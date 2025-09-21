@@ -6,6 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useApp } from '../contexts/AppContext';
+import { track } from '../lib/analytics';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.5;
@@ -125,6 +126,17 @@ useEffect(() => {
     const v = variant || currentVariant;
     const startY = v?.type === 'coach_unlocked' ? SCREEN_HEIGHT * 0.7 : SHEET_HEIGHT;
     sheetY.setValue(startY);
+
+    // Analytics tracking when announcement is shown
+    if (visible && v) {
+      const payload =
+        v.type === 'reward_unlocked'
+          ? { type: 'reward_unlocked', streak: v.streak, reward_id: v.rewardId }
+          : v.type === 'coach_unlocked'
+          ? { type: 'coach_unlocked', streak: v.streak, coach_id: v.coachId, coach_name: v.coachName }
+          : { type: 'streak_plus', streak: v.streak };
+      track('announcement_shown', payload).catch(() => {});
+    }
 
     setModalVisible(true);
     Animated.parallel([

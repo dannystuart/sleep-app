@@ -5,6 +5,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useApp } from '../../contexts/AppContext';
+import { startAnalyticsSession, track } from '../../lib/analytics';
 
 export default function TabLayout() {
   const [isUILoading, setIsUILoading] = useState(true);
@@ -21,6 +22,13 @@ export default function TabLayout() {
     // Let the LoadingSpinner control the duration
     // The LoadingSpinner will call handleLoadingComplete when ready
   }, []);
+
+  useEffect(() => {
+    // Start analytics session when app is ready (after loading completes)
+    if (shouldShowApp) {
+      startAnalyticsSession('cold');
+    }
+  }, [shouldShowApp]);
 
   if (!shouldShowApp) {
     return <LoadingSpinner 

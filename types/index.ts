@@ -112,4 +112,13 @@ export interface AppContextType extends AppState {
     devSetStreakDays?: (n: number) => Promise<void>;
     devResetStreak?: () => Promise<void>;
   };
+
+  // Local notifications
+  scheduleDailyReminder: (hour?: number, minute?: number) => Promise<string>;
+  scheduleBedtimeReminder: () => Promise<string>;
+  scheduleMorningReminder: () => Promise<string>;
+  scheduleAllDailyNotifications: () => Promise<any[]>;
+  cancelAllLocalReminders: () => Promise<void>;
+  scheduleOneOffIn: (seconds?: number, title?: string, body?: string) => Promise<string>;
+  ensureLocalNotifPermission: () => Promise<boolean>;
 } 

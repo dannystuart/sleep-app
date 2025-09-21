@@ -17,6 +17,7 @@ import { SafeAreaView } from '../components/SafeAreaView';
 import { useApp } from '../contexts/AppContext';
 import { ChevronLeft, Play, Pause, SkipBack, Clock, PauseCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { track } from '../lib/analytics';
 
 export default function SleepSessionScreen() {
   const router = useRouter();
@@ -111,6 +112,13 @@ export default function SleepSessionScreen() {
         timer_seconds: timerSeconds 
       });
       
+      // Analytics tracking for separate stream
+      track('session_start', {
+        coach_id: coach.id,
+        class_id: cls.id,
+        timer_seconds: timerSeconds,
+      }).catch(() => {});
+      
       // 2. Configure audio mode
       await Audio.setAudioModeAsync({
         staysActiveInBackground: true,
@@ -171,6 +179,13 @@ export default function SleepSessionScreen() {
         class_id: cls.id, 
         timer_seconds: timerSeconds 
       });
+      
+      // Analytics tracking for separate stream
+      track('session_complete', {
+        coach_id: coach.id,
+        class_id: cls.id,
+        timer_seconds: timerSeconds,
+      }).catch(() => {});
 
       console.log('🔥 Updating streak and diary...');
       // NEW: update streak + diary
@@ -217,6 +232,12 @@ export default function SleepSessionScreen() {
 
   // Back early handler
   const goBackEarly = () => {
+    // Analytics tracking for separate stream
+    track('session_abandoned', {
+      coach_id: coach.id,
+      class_id: cls.id,
+    }).catch(() => {});
+    
     cleanupSession();
     router.back();
   };

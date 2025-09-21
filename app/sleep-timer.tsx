@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from '../components/SafeAreaView';
 import { useApp } from '../contexts/AppContext';
 import { ChevronLeft } from 'lucide-react-native';
+import { track } from '../lib/analytics';
 
 const { width } = Dimensions.get('window');
 const maxWidth = Math.min(width, 400);
@@ -17,6 +18,7 @@ export default function SleepTimerScreen() {
 
   const handleTimerSelect = (seconds: number) => {
     setTempSelectedTimer(seconds);
+    track('select_timer', { timer_seconds: seconds }).catch(() => {});
   };
 
   const handleBackPress = async () => {

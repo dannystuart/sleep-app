@@ -2,6 +2,11 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { getStorageItem, setStorageItem } from '../lib/storage';
 import { AppContextType, AppState, Coach, Class, SessionAudio, SessionEvent, DiaryEntry, StreakState, StreakPublicState } from '../types';
+import { registerForPushNotificationsAsync } from '../lib/notifications';
+import { attachLocalDevGlobals, scheduleDailyReminder, cancelAllLocalReminders, scheduleOneOffIn, ensureLocalNotifPermission, scheduleBedtimeReminder, scheduleMorningReminder, scheduleAllDailyNotifications } from '../lib/localNotifications';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 
 // UUID helper function
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -45,6 +50,8 @@ function isYesterday(prevKey: string, todayKey: string): boolean {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const router = useRouter();
+  
   const [state, setState] = useState<AppState>({
     coaches: [],
     classes: [],
@@ -66,6 +73,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sessionsByDate: {}
   });
   
+  // Session state for notifications
+  const [session, setSession] = useState<any>(null);
+  
   // Test mode - set to true to allow multiple sessions per day
   const TEST_MODE = true;
 
@@ -84,6 +94,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     initializeApp();
   }, []);
+
+  // A) expose dev console helpers (no UI)
+  useEffect(() => {
+    if (__DEV__) attachLocalDevGlobals();
+  }, []);
+
+  // C) automatically schedule daily notifications on app launch
+  useEffect(() => {
+    (async () => {
+      try {
+        const results = await scheduleAllDailyNotifications();
+        if (results.length > 0) {
+          console.log('🔔 Daily notifications scheduled:', results);
+        }
+      } catch (error) {
+        console.error('❌ Failed to schedule daily notifications:', error);
+      }
+    })();
+  }, []); // Run once on app launch
+
+  // B) navigate on notification tap (works for both push + local)
+  //    also handles cold start case
+  useEffect(() => {
+    let sub: Notifications.Subscription | undefined;
+
+    (async () => {
+      const last = await Notifications.getLastNotificationResponseAsync();
+      const data = last?.notification?.request?.content?.data as any;
+      if (data?.screen) {
+        const path = String(data.screen);
+        router.push((path.startsWith('/') ? path : `/${path}`) as any);
+      }
+    })();
+
+    sub = Notifications.addNotificationResponseReceivedListener((resp) => {
+      const data = resp.notification.request.content.data as any;
+      if (data?.screen) {
+        const path = String(data.screen);
+        router.push((path.startsWith('/') ? path : `/${path}`) as any);
+      }
+    });
+
+    return () => sub?.remove();
+  }, [router]);
+
+  // Handle push notifications
+  useEffect(() => {
+    (async () => {
+      const { token, error } = await registerForPushNotificationsAsync();
+      if (token && !error) {
+        // Persist in Supabase (idempotent-ish)
+        try {
+          await (supabase as any)
+            .from('push_subscriptions')
+            .upsert({
+              user_id: session?.user?.id ?? null,
+              expo_push_token: token,
+              platform: Platform.OS,
+              last_seen_at: new Date().toISOString(),
+            }, { onConflict: 'expo_push_token' });
+        } catch (dbError) {
+          console.log('Push token table not found or error saving token:', dbError);
+          // Continue without saving to database for now
+        }
+      } else {
+        console.log('Push registration failed', error);
+      }
+    })();
+  }, [session?.user?.id]);
 
   const initializeApp = async () => {
     try {
@@ -763,6 +842,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       devSetStreakDays,
       devResetStreak,
     },
+    // Local notifications
+    scheduleDailyReminder,
+    scheduleBedtimeReminder,
+    scheduleMorningReminder,
+    scheduleAllDailyNotifications,
+    cancelAllLocalReminders,
+    scheduleOneOffIn,
+    ensureLocalNotifPermission,
   };
 
   return (

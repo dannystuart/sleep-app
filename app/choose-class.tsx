@@ -4,6 +4,7 @@ import { SafeAreaView } from '../components/SafeAreaView';
 import { ChevronLeft } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useApp } from '../contexts/AppContext';
+import { track } from '../lib/analytics';
 
 export default function ChooseClassScreen() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function ChooseClassScreen() {
 
   const handleClassSelect = (classId: string) => {
     setTempSelectedClass(classId);
+    track('select_class', { class_id: classId }).catch(() => {});
   };
 
   // Initialize temp selection based on current selection

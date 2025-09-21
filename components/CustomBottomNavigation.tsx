@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback, memo } from 'react';
 import { View, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
+import { track } from '../lib/analytics';
 
 const { width } = Dimensions.get('window');
 
@@ -97,6 +98,12 @@ export default function CustomBottomNavigation() {
   const handleTabPress = useCallback((route: string) => {
     // Prevent unnecessary navigation if already on the same tab
     if (route === activeTab) return;
+    
+    // analytics
+    const to =
+      route === '/' ? 'Play' :
+      route === '/diary' ? 'Diary' : 'Settings';
+    track('navigate_tab', { to }).catch(() => {});
     
     router.push(route as any);
   }, [activeTab, router]);

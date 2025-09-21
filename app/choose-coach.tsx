@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from '../components/SafeAreaView';
 import { useApp } from '../contexts/AppContext';
 import { ChevronLeft } from 'lucide-react-native';
+import { track } from '../lib/analytics';
 
 const { width } = Dimensions.get('window');
 const maxWidth = Math.min(width, 400);
@@ -44,6 +45,7 @@ export default function ChooseCoachScreen() {
 
   const handleCoachSelect = (coachId: string) => {
     setTempSelectedCoachId(coachId);
+    track('select_coach', { coach_id: coachId }).catch(() => {});
   };
 
   const handleBackPress = async () => {

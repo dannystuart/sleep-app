@@ -11,6 +11,7 @@ import { StreakPublicState } from '../../types';
 import { DebugPanel } from '../../components/DebugPanel';
 import { StreakSheet } from '../../components/StreakSheet';
 import { AnnouncementSheet } from '../../components/AnnouncementSheet';
+import { track } from '../../lib/analytics';
 
 const { width } = Dimensions.get('window');
 const maxWidth = Math.min(width, 400);
@@ -21,6 +22,7 @@ export default function HomeScreen() {
   const [streakUI, setStreakUI] = useState<StreakPublicState | null>(null);
   const [showStreakSheet, setShowStreakSheet] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
 
   // pull announcements from context
   const app = useApp();
@@ -98,6 +100,31 @@ export default function HomeScreen() {
 
   const handlePlayButtonPress = () => {
     router.push('/sleep-session');
+  };
+
+  // Secret debug panel toggle - tap the logo 5 times quickly
+  const [logoTapCount, setLogoTapCount] = useState(0);
+  const [lastLogoTap, setLastLogoTap] = useState(0);
+
+  const handleLogoTap = () => {
+    const now = Date.now();
+    const timeSinceLastTap = now - lastLogoTap;
+    
+    // Reset count if more than 2 seconds since last tap
+    if (timeSinceLastTap > 2000) {
+      setLogoTapCount(1);
+    } else {
+      const newCount = logoTapCount + 1;
+      setLogoTapCount(newCount);
+      
+      // Show debug panel after 5 taps
+      if (newCount >= 5) {
+        setShowDebugPanel(true);
+        setLogoTapCount(0);
+      }
+    }
+    
+    setLastLogoTap(now);
   };
 
   // Prefetch the background image for smooth transitions
@@ -210,7 +237,11 @@ export default function HomeScreen() {
             {/* App Content */}
             <View style={styles.content}>
               {/* Logo */}
-              <View style={styles.logoContainer}>
+              <TouchableOpacity 
+                style={styles.logoContainer}
+                onPress={handleLogoTap}
+                activeOpacity={0.8}
+              >
                 <View style={styles.logoContent}>
                   <Image 
                     source={require('../../assets/images/brain-icon.png')}
@@ -218,10 +249,13 @@ export default function HomeScreen() {
                   />
                   <Text style={styles.logo}>theta</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               {/* Current Streak Card */}
-              <TouchableOpacity activeOpacity={0.8} onPress={() => setShowStreakSheet(true)}>
+              <TouchableOpacity activeOpacity={0.8} onPress={() => {
+                track('open_streak_sheet').catch(() => {});
+                setShowStreakSheet(true);
+              }}>
                 <View style={styles.streakCard}>
                   <View style={styles.streakContent}>
                     <View style={styles.streakLeft}>
@@ -271,10 +305,10 @@ export default function HomeScreen() {
                         <Text style={styles.streakMessage}>You're sleeping well, keep going!</Text>
                       )}
                       
-                      {/* Coach unlock motivation */}
+                      {/* Coach unlock motivation 
                       {coachMotivationText && (
                         <Text style={styles.coachMotivation}>{coachMotivationText}</Text>
-                      )}
+                      )}*/}
                     </View>
                   </View>
                 </View>
@@ -325,7 +359,7 @@ export default function HomeScreen() {
             </View>
           </View>
         </SafeAreaView>
-        <DebugPanel />
+        {showDebugPanel && <DebugPanel onClose={() => setShowDebugPanel(false)} />}
       </View>
 
       <StreakSheet

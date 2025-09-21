@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, G } from 'react-native-svg';
 import { RatingBottomSheet } from '../../components/RatingBottomSheet';
 import { useApp } from '../../contexts/AppContext';
+import { track } from '../../lib/analytics';
 
 const { width } = Dimensions.get('window');
 const maxWidth = Math.min(width, 400);
@@ -246,6 +247,10 @@ export default function DiaryScreen() {
   async function handleSubmit(rating: 'Good' | 'OK' | 'Poor') {
     if (sheetEntry) {
       await rateDiaryEntry(sheetEntry.id, rating);
+      track('diary_entry_rated', {
+        date_key: sheetEntry.id,
+        rating,
+      }).catch(() => {});
     }
     setSheetVisible(false);
   }
