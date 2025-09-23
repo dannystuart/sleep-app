@@ -195,7 +195,11 @@ export default function SleepSessionScreen() {
       timerRef.current = null;
     }
     if (player) {
-      player.pause();
+      try {
+        player.pause();
+      } catch (error) {
+        console.warn('Failed to pause player during cleanup:', error);
+      }
     }
   };
 
@@ -206,14 +210,18 @@ export default function SleepSessionScreen() {
       return;
     }
     
-    if (isPlaying) {
-      player.pause();
-      setIsPaused(true);
-      pauseTimer();
-    } else {
-      player.play();
-      setIsPaused(false);
-      resumeTimer();
+    try {
+      if (isPlaying) {
+        player.pause();
+        setIsPaused(true);
+        pauseTimer();
+      } else {
+        player.play();
+        setIsPaused(false);
+        resumeTimer();
+      }
+    } catch (error) {
+      console.warn('Failed to toggle play/pause:', error);
     }
   };
 
@@ -276,9 +284,13 @@ export default function SleepSessionScreen() {
   const seekTo = (seekPercentage: number) => {
     if (!player || !length) return;
     
-    const seekTime = (seekPercentage / 100) * length;
-    player.seekTo(seekTime / 1000); // Convert milliseconds to seconds
-    // Don't update session position - that should continue based on real time
+    try {
+      const seekTime = (seekPercentage / 100) * length;
+      player.seekTo(seekTime / 1000); // Convert milliseconds to seconds
+      // Don't update session position - that should continue based on real time
+    } catch (error) {
+      console.warn('Failed to seek audio:', error);
+    }
   };
 
   const onProgressBarPress = (event: any) => {

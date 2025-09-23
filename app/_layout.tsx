@@ -23,7 +23,7 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { enableScreens } from 'react-native-screens';
 import { View, ImageBackground, StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { AppProvider } from '../contexts/AppContext';
+import { AppProvider, useApp } from '../contexts/AppContext';
 import { getStorageItem } from '../lib/storage';
 
 // Re-enable native screens so React Navigation can hide inactive tabs
@@ -38,8 +38,9 @@ declare global {
   }
 }
 
-export default function RootLayout() {
-  useFrameworkReady();
+// Component that handles app loading logic inside AppProvider
+function AppContent() {
+  const { isLoading } = useApp();
   const router = useRouter();
   
   const [fontsLoaded, fontError] = useFonts({
@@ -60,7 +61,11 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    console.log('🔄 Loading state check:', { fontsLoaded, fontError, isLoading });
+    
+    // Wait for both fonts AND app context to be ready
+    if ((fontsLoaded || fontError) && !isLoading) {
+      console.log('✅ All loading complete - hiding splash screen');
       SplashScreen.hideAsync();
 
       // decide onboarding vs home
@@ -72,92 +77,109 @@ export default function RootLayout() {
           router.replace('/onboarding');
         }
       })();
+    } else {
+      console.log('⏳ Still loading:', { 
+        fontsLoaded: fontsLoaded || fontError, 
+        appContextReady: !isLoading 
+      });
     }
     window.frameworkReady?.();
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, isLoading]);
 
-  // Return null to keep splash screen visible while fonts load
+  // Return null to keep splash screen visible while loading
   if (!fontsLoaded && !fontError) {
+    return null;
+  }
+  
+  if (isLoading) {
     return null;
   }
 
   return (
-    <AppProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          {/* 
-            StatusBar with translucent background so content draws under it
-          */}
-          <StatusBar
-            style="light"
-            backgroundColor="transparent"
-            translucent={true}
-          />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        {/* 
+          StatusBar with translucent background so content draws under it
+        */}
+        <StatusBar
+          style="light"
+          backgroundColor="transparent"
+          translucent={true}
+        />
 
-          {/* 
-            ImageBackground at root, covers full screen including status bar and safe areas
+        {/* 
+          ImageBackground at root, covers full screen including status bar and safe areas
+        */}
+        <ImageBackground
+          source={require('../assets/images/THETA-BG.png')}
+          style={styles.background}
+          resizeMode="cover"
+        >
+          {/*
+            SafeAreaView with transparent background
+            edges ['top','bottom'] means children are padded,
+            but the background image still shows under the insets.
           */}
-          <ImageBackground
-            source={require('../assets/images/THETA-BG.png')}
-            style={styles.background}
-            resizeMode="cover"
+          <SafeAreaView
+            style={styles.safeArea}
+            edges={['top', 'bottom']}
           >
-            {/*
-              SafeAreaView with transparent background
-              edges ['top','bottom'] means children are padded,
-              but the background image still shows under the insets.
-            */}
-            <SafeAreaView
-              style={styles.safeArea}
-              edges={['top', 'bottom']}
-            >
-              <Stack screenOptions={{ 
-                headerShown: false,
-                contentStyle: { backgroundColor: 'transparent' },
-                animation: 'none'
-              }}>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'card', animation: 'fade' }} />
-                <Stack.Screen name="onboarding-coach" options={{ headerShown: false, presentation: "card", animation: "slide_from_right" }} />
-                <Stack.Screen 
-                  name="choose-coach" 
-                  options={{ 
-                    headerShown: false,
-                    presentation: 'modal',
-                    animation: 'slide_from_bottom'
-                  }} 
-                />
-                                     <Stack.Screen
-                         name="choose-class"
-                         options={{
-                           headerShown: false,
-                           presentation: 'modal',
-                           animation: 'slide_from_bottom'
-                         }}
-                       />
-                       <Stack.Screen
-                         name="sleep-timer"
-                         options={{
-                           headerShown: false,
-                           presentation: 'modal',
-                           animation: 'slide_from_bottom'
-                         }}
-                       />
-                       <Stack.Screen
-                         name="sleep-session"
-                         options={{
-                           headerShown: false,
-                           presentation: 'card',
-                           animation: 'slide_from_right',
-                           contentStyle: { backgroundColor: '#000' }
-                         }}
-                       />
-                       <Stack.Screen name="+not-found" />
-              </Stack>
-            </SafeAreaView>
-          </ImageBackground>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
+            <Stack screenOptions={{ 
+              headerShown: false,
+              contentStyle: { backgroundColor: 'transparent' },
+              animation: 'none'
+            }}>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'card', animation: 'fade' }} />
+              <Stack.Screen name="onboarding-coach" options={{ headerShown: false, presentation: "card", animation: "slide_from_right" }} />
+              <Stack.Screen 
+                name="choose-coach" 
+                options={{ 
+                  headerShown: false,
+                  presentation: 'modal',
+                  animation: 'slide_from_bottom'
+                }} 
+              />
+                                   <Stack.Screen
+                       name="choose-class"
+                       options={{
+                         headerShown: false,
+                         presentation: 'modal',
+                         animation: 'slide_from_bottom'
+                       }}
+                     />
+                     <Stack.Screen
+                       name="sleep-timer"
+                       options={{
+                         headerShown: false,
+                         presentation: 'modal',
+                         animation: 'slide_from_bottom'
+                       }}
+                     />
+                     <Stack.Screen
+                       name="sleep-session"
+                       options={{
+                         headerShown: false,
+                         presentation: 'card',
+                         animation: 'slide_from_right',
+                         contentStyle: { backgroundColor: '#000' }
+                       }}
+                     />
+                     <Stack.Screen name="+not-found" />
+            </Stack>
+          </SafeAreaView>
+        </ImageBackground>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  useFrameworkReady();
+  
+  return (
+    <AppProvider>
+      <AppContent />
     </AppProvider>
   );
 }
