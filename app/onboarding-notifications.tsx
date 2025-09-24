@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ImageBackground, Platform, TouchableOpacity, Dimensions, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity, Dimensions, Alert } from 'react-native';
+import { Image } from 'expo-image';
+import { ScreenBackground } from '../components/ScreenBackground';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { Stack } from 'expo-router';
@@ -129,14 +131,8 @@ export default function OnboardingNotifications() {
         {/* Solid Background Layer - Same as other onboarding screens */}
         <View style={styles.solidBackground} />
         
-        {/* Image Layer - THETA-BG-TRANS.png - Same as other onboarding screens */}
-        <ImageBackground
-          source={require('../assets/images/THETA-BG-TRANS.png')}
-          style={styles.imageBackground}
-          resizeMode="cover"
-        >
-          <View style={styles.imageOverlay} />
-        </ImageBackground>
+        {/* Cached + manual fade BG */}
+        <ScreenBackground source={require('../assets/images/THETA-BG-TRANS.png')} />
 
         {/* Title */}
         <View style={styles.titleContainer}>
@@ -145,10 +141,10 @@ export default function OnboardingNotifications() {
 
         {/* Gradient Container (Background) */}
         <View style={styles.gradcontainer}>
-          <ImageBackground
+          <Image
             source={require('../assets/images/onboarding/onboarding-gradient.png')}
             style={styles.gradientImage}
-            resizeMode="stretch"
+            contentFit="fill"
             onError={(error) => console.log('❌ Image loading error:', error)}
             onLoad={() => console.log('✅ Image loaded successfully')}
           />

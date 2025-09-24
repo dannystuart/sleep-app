@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, ImageBackground, Platform, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
+import { ScreenBackground } from '../components/ScreenBackground';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { Stack } from 'expo-router';
@@ -46,23 +48,17 @@ export default function OnboardingStreak() {
         {/* Solid Background Layer - Same as other onboarding screens */}
         <View style={styles.solidBackground} />
         
-        {/* Image Layer - THETA-BG-TRANS.png - Same as other onboarding screens */}
-        <ImageBackground
-          source={require('../assets/images/THETA-BG-TRANS.png')}
-          style={styles.imageBackground}
-          resizeMode="cover"
-        >
-          <View style={styles.imageOverlay} />
-        </ImageBackground>
+        {/* Cached + manual fade BG */}
+        <ScreenBackground source={require('../assets/images/THETA-BG-TRANS.png')} />
 
         {/* Main Content */}
         <View style={styles.contentContainer}>
           {/* Streak Image */}
           <View style={styles.imageContainer}>
-            <ImageBackground
+            <Image
               source={require('../assets/images/onboarding/onboarding-streak.png')}
               style={styles.streakImage}
-              resizeMode="contain"
+              contentFit="contain"
             />
           </View>
 

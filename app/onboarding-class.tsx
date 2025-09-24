@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image, ImageBackground, Platform } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image, Platform } from 'react-native';
+import { ScreenBackground } from '../components/ScreenBackground';
 import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue,
@@ -120,13 +121,7 @@ export default function OnboardingClass() {
     return (
       <View style={styles.container}>
         <View style={styles.solidBackground} />
-        <ImageBackground
-          source={require('../assets/images/THETA-BG-TRANS.png')}
-          style={styles.imageBackground}
-          resizeMode="cover"
-        >
-          <View style={styles.imageOverlay} />
-        </ImageBackground>
+        <ScreenBackground source={require('../assets/images/THETA-BG-TRANS.png')} />
         <View style={styles.center}>
           <Text style={styles.loadingText}>Loading classes...</Text>
         </View>
@@ -159,14 +154,8 @@ export default function OnboardingClass() {
         {/* Solid Background Layer - Same as onboarding */}
         <View style={styles.solidBackground} />
         
-        {/* Image Layer - THETA-BG-TRANS.png - Same as onboarding */}
-        <ImageBackground
-          source={require('../assets/images/THETA-BG-TRANS.png')}
-          style={styles.imageBackground}
-          resizeMode="cover"
-        >
-          <View style={styles.imageOverlay} />
-        </ImageBackground>
+        {/* Cached + manual fade BG */}
+        <ScreenBackground source={require('../assets/images/THETA-BG-TRANS.png')} />
 
         {/* Title */}
         <View style={styles.titleContainer}>

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ImageBackground, Platform } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Platform } from 'react-native';
 import { Image } from 'expo-image';
+import { ScreenBackground } from '../components/ScreenBackground';
 import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue,
@@ -461,13 +462,7 @@ export default function OnboardingCoach() {
     return (
       <View style={styles.container}>
         <View style={styles.solidBackground} />
-        <ImageBackground
-          source={require('../assets/images/THETA-BG-TRANS.png')}
-          style={styles.imageBackground}
-          resizeMode="cover"
-        >
-          <View style={styles.imageOverlay} />
-        </ImageBackground>
+        <ScreenBackground source={require('../assets/images/THETA-BG-TRANS.png')} />
         <View style={styles.center}>
           <Text style={styles.loadingText}>
             {coaches.length === 0
@@ -484,14 +479,8 @@ export default function OnboardingCoach() {
       {/* Solid Background Layer - Same as onboarding */}
       <View style={styles.solidBackground} />
       
-      {/* Image Layer - THETA-BG-TRANS.png - Same as onboarding */}
-      <ImageBackground
-        source={require('../assets/images/THETA-BG-TRANS.png')}
-        style={styles.imageBackground}
-        resizeMode="cover"
-      >
-        <View style={styles.imageOverlay} />
-      </ImageBackground>
+      {/* Cached + manual fade BG */}
+      <ScreenBackground source={require('../assets/images/THETA-BG-TRANS.png')} />
 
       {/* Header 
       <View style={styles.header}>

@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
-import { Asset } from 'expo-asset';
 // Safe TrackPlayer import with Expo Go fallback
 let TrackPlayer: any = null;
 let TrackPlayerState: any = null;
@@ -33,6 +32,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from '../../components/SafeAreaView';
+import { ScreenBackground } from '../../components/ScreenBackground';
 import { useApp } from '../../contexts/AppContext';
 import { ChevronDown, Play, Pause, SkipBack, Clock, PauseCircle, ArrowDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -62,7 +62,6 @@ export default function SleepSessionScreen() {
   // Check if audio is available for this combination
   const hasAudio = audioUrl && !audioUrl.includes('example.com');
 
-  const bgOpacity = useRef(new Animated.Value(0)).current;
   const [position, setPosition] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioPosition, setAudioPosition] = useState(0);
@@ -94,10 +93,6 @@ export default function SleepSessionScreen() {
     return classDisplayNames[cls.name] || cls.name || 'Select Class';
   };
 
-  // 1) preload background
-  useEffect(() => {
-    Asset.loadAsync(require('../../assets/images/THETA-BG.png'));
-  }, []);
 
   // 2) defer session setup until after nav animation
   useEffect(() => {
@@ -146,19 +141,6 @@ export default function SleepSessionScreen() {
     return () => sub.remove();
   }, [hasAudio, isPlaying]);
 
-  // fade in on load **or** error
-  const onBgLoad = () => animateIn();
-  const onBgError = () => {
-    console.warn('BG image failed to load');
-    animateIn();
-  };
-  const animateIn = () => {
-    Animated.timing(bgOpacity, {
-      toValue: 1,
-      duration: 220,
-      useNativeDriver: true,
-    }).start();
-  };
 
   // session logic - load & play one track
   const startSession = async () => {
@@ -523,18 +505,8 @@ export default function SleepSessionScreen() {
         {/* fallback solid bg */}
         <View style={styles.fallback} />
 
-        {/* animated image on top (fades in over solid fallback) */}
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: bgOpacity }]}>
-          <ExpoImage
-            source={require('../../assets/images/THETA-BG.png')}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            transition={0}             // disable built-in fade
-            cachePolicy="disk"         // keep cached on disk
-            onLoad={onBgLoad}
-            onError={onBgError}
-          />
-        </Animated.View>
+        {/* Cached + manual fade BG */}
+        <ScreenBackground source={require('../../assets/images/THETA-BG.png')} />
 
         <SafeAreaView style={styles.container}>
         {/* HEADER */}
@@ -545,7 +517,7 @@ export default function SleepSessionScreen() {
           }}>
             <ArrowDown color="white" size={24}/>
           </TouchableOpacity>
-          <Text style={styles.title}>Sleep Session</Text>
+          <Text style={styles.title}>Sleep Session 3</Text>
           <View style={{width:24}}/>
         </View>
 

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ImageBackground, Platform, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity, Dimensions } from 'react-native';
+import { ScreenBackground } from '../components/ScreenBackground';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import Animated, {
@@ -459,14 +460,8 @@ export default function Onboarding() {
         />
       </Animated.View>
       
-      {/* Image Layer - THETA-BG-TRANS.png */}
-      <ImageBackground
-        source={require('../assets/images/THETA-BG-TRANS.png')}
-        style={styles.imageBackground}
-        resizeMode="cover"
-      >
-        <View style={styles.imageOverlay} />
-      </ImageBackground>
+      {/* Cached + manual fade BG */}
+      <ScreenBackground source={require('../assets/images/THETA-BG-TRANS.png')} />
       
       {/* Text Layer - Animated Content */}
       <View style={styles.center}>
