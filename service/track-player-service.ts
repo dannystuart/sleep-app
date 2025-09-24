@@ -1,24 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Safe TrackPlayer import with Expo Go fallback
-let TrackPlayer: any = null;
-let Event: any = null;
-let State: any = null;
-
-const isExpoGo = typeof __DEV__ !== 'undefined' && __DEV__ && !(global as any).nativeCallSyncHook;
-
-if (!isExpoGo) {
-  try {
-    const trackPlayerModule = require('react-native-track-player');
-    TrackPlayer = trackPlayerModule.default;
-    Event = trackPlayerModule.Event;
-    State = trackPlayerModule.State;
-  } catch (error) {
-    console.warn('TrackPlayer not available in service, using fallback');
-  }
-} else {
-  console.warn('Running in Expo Go, TrackPlayer service not available');
-}
+import TrackPlayer, { Event, State } from 'react-native-track-player';
+import { PLAYER_STATE_STORAGE_KEY } from '../lib/audio/constants';
 
 // Single in-memory cache to avoid reading storage too often
 let sleepEndTs: number | null = null;
@@ -59,14 +41,9 @@ function clearTimerGuard() {
   sleepEndTs = null;
 }
 
-module.exports = async function () {
+export default async function TrackPlayerService() {
   try {
     console.log('🎵 TrackPlayer service starting...');
-    
-    if (!TrackPlayer) {
-      console.warn('TrackPlayer not available, service will not function');
-      return;
-    }
     
     // When the service starts, load any scheduled end time and begin checking
     await loadSleepEndTs();
@@ -76,14 +53,24 @@ module.exports = async function () {
     }
 
     // Remote control events
-    TrackPlayer.addEventListener(Event.RemotePlay, () => {
+    TrackPlayer.addEventListener(Event.RemotePlay, async () => {
       console.log('🎮 Remote play pressed');
-      TrackPlayer.play().catch(error => console.warn('RemotePlay failed:', error));
+      try {
+        await TrackPlayer.play();
+        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'playing');
+      } catch (error) {
+        console.warn('RemotePlay failed:', error);
+      }
     });
     
-    TrackPlayer.addEventListener(Event.RemotePause, () => {
+    TrackPlayer.addEventListener(Event.RemotePause, async () => {
       console.log('🎮 Remote pause pressed');
-      TrackPlayer.pause().catch(error => console.warn('RemotePause failed:', error));
+      try {
+        await TrackPlayer.pause();
+        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'paused');
+      } catch (error) {
+        console.warn('RemotePause failed:', error);
+      }
     });
     
     TrackPlayer.addEventListener(Event.RemoteStop, async () => {
@@ -92,6 +79,7 @@ module.exports = async function () {
         await TrackPlayer.stop();
         clearTimerGuard();
         await AsyncStorage.removeItem('theta_sleep_end_ts');
+        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
         console.log('🛑 Session stopped from remote control');
       } catch (error) {
         console.warn('RemoteStop failed:', error);
@@ -116,6 +104,9 @@ module.exports = async function () {
           console.log('⏰ Starting timer guard');
           startTimerGuard();
         }
+        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'playing');
+      } else if (state === State.Paused || state === State.Stopped) {
+        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'paused');
       }
     });
 
@@ -123,4 +114,4 @@ module.exports = async function () {
   } catch (error) {
     console.warn('TrackPlayer service initialization failed:', error);
   }
-};
+}

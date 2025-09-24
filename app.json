@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash/splash-logo.png",
-      "backgroundColor": "#292444",
+      "backgroundColor": "#171221",
       "resizeMode": "contain"
     },
     "ios": {
@@ -19,11 +19,11 @@
       "buildNumber": "1",
       "splash": {
         "image": "./assets/splash/splash-logo.png",
-        "backgroundColor": "#292444",
+        "backgroundColor": "#171221",
         "resizeMode": "contain",
         "dark": {
           "image": "./assets/splash/splash-logo.png",
-          "backgroundColor": "#292444"
+          "backgroundColor": "#171221"
         }
       },
       "infoPlist": {

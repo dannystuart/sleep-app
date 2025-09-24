@@ -11,23 +11,7 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
-// Safe TrackPlayer import with Expo Go fallback
-let TrackPlayer: any = null;
-let TrackPlayerState: any = null;
-
-const isExpoGo = typeof __DEV__ !== 'undefined' && __DEV__ && !(global as any).nativeCallSyncHook;
-
-if (!isExpoGo) {
-  try {
-    const trackPlayerModule = require('react-native-track-player');
-    TrackPlayer = trackPlayerModule.default;
-    TrackPlayerState = trackPlayerModule.State;
-  } catch (error) {
-    console.warn('TrackPlayer not available, using fallback');
-  }
-} else {
-  console.warn('Running in Expo Go, TrackPlayer not available');
-}
+import TrackPlayer, { Event as TrackPlayerEvent, State as TrackPlayerState } from 'react-native-track-player';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
@@ -37,6 +21,7 @@ import { useApp } from '../../contexts/AppContext';
 import { ChevronDown, Play, Pause, SkipBack, Clock, PauseCircle, ArrowDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { track } from '../../lib/analytics';
+import { ACTIVE_SESSION_STORAGE_KEY, PLAYER_STATE_STORAGE_KEY } from '../../lib/audio/constants';
 
 export default function SleepSessionScreen() {
   const router = useRouter();
@@ -66,6 +51,7 @@ export default function SleepSessionScreen() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioPosition, setAudioPosition] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+  const [isInitializing, setIsInitializing] = useState(false);
   
   // TrackPlayer state
   const timerRef = useRef<ReturnType<typeof setInterval>|null>(null);
@@ -101,19 +87,17 @@ export default function SleepSessionScreen() {
       task.cancel?.();
       cleanupSession();
     };
-  }, []);
+  }, [selectedCoachId, selectedClassId, timerSeconds]); // Restart session when parameters change
 
   // AppState guard - if app wakes after timer elapsed, end immediately
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (state) => {
       if (state === 'active') {
-        // Sync with TrackPlayer state when app becomes active
-        if (hasAudio && TrackPlayer) {
+        if (hasAudio) {
           try {
             const trackPlayerState = await TrackPlayer.getState();
             const isCurrentlyPlaying = trackPlayerState === TrackPlayerState.Playing;
             console.log('📱 App became active, syncing state:', isCurrentlyPlaying);
-            
             if (isCurrentlyPlaying !== isPlaying) {
               setIsPlaying(isCurrentlyPlaying);
               if (isCurrentlyPlaying) {
@@ -126,19 +110,37 @@ export default function SleepSessionScreen() {
             console.warn('Failed to sync state on app active:', error);
           }
         }
-        
-        // Check if timer has elapsed
+
         if (sessionEndTime.current && Date.now() >= sessionEndTime.current) {
-          if (TrackPlayer) {
-            try { 
-              await TrackPlayer.stop(); 
-            } catch {}
-          }
+          try {
+            await TrackPlayer.stop();
+          } catch {}
           finishSession();
         }
       }
     });
-    return () => sub.remove();
+
+    const playbackSub = TrackPlayer.addEventListener(TrackPlayerEvent.PlaybackState, async ({ state }) => {
+      console.log('🎵 Playback state updated (component listener):', state);
+      if (state === TrackPlayerState.Playing) {
+        if (!isPlaying) {
+          setIsPlaying(true);
+          resumeTimer();
+        }
+        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'playing');
+      } else if (state === TrackPlayerState.Paused || state === TrackPlayerState.Stopped) {
+        if (isPlaying) {
+          setIsPlaying(false);
+          pauseTimer();
+        }
+        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'paused');
+      }
+    });
+
+    return () => {
+      sub.remove();
+      playbackSub.remove();
+    };
   }, [hasAudio, isPlaying]);
 
 
@@ -174,27 +176,22 @@ export default function SleepSessionScreen() {
       
       // 3. Queue single track with TrackPlayer
       console.log('🎵 Loading audio:', audioUrl);
-      if (TrackPlayer) {
-        try {
-          await TrackPlayer.reset();
-          await TrackPlayer.add({
-            id: `${coach.id}-${cls.id}`,
-            url: audioUrl!,
-            title: `${coach.name} — ${getClassDisplayName()}`,
-            artist: 'Theta',
-            artwork: coach.image_url || undefined,
-          });
-          await TrackPlayer.play();
-          setIsPlaying(true);
-          console.log('✅ TrackPlayer started successfully');
-        } catch (trackPlayerError) {
-          console.warn('TrackPlayer failed, falling back to timer-only session:', trackPlayerError);
-          // Continue with timer-only session - audio will not play but timer will work
-          setIsPlaying(true); // Set playing state for UI even without audio
-        }
-      } else {
-        console.warn('TrackPlayer not available, running timer-only session');
-        setIsPlaying(true); // Set playing state for UI even without audio
+      try {
+        await TrackPlayer.reset();
+        await TrackPlayer.add({
+          id: `${coach.id}-${cls.id}`,
+          url: audioUrl!,
+          title: `${coach.name} — ${getClassDisplayName()}`,
+          artist: 'Theta',
+          artwork: coach.image_url || undefined,
+        });
+        await TrackPlayer.play();
+        setIsPlaying(true);
+        console.log('✅ TrackPlayer started successfully');
+        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'playing');
+      } catch (trackPlayerError) {
+        console.warn('TrackPlayer failed, falling back to timer-only session:', trackPlayerError);
+        setIsPlaying(true);
       }
       
       // 4. Set absolute end time (ms since epoch)
@@ -302,29 +299,58 @@ export default function SleepSessionScreen() {
       });
       console.log('✅ Streak update result:', result);
 
-      cleanupSession();
+      await cleanupSession();
       router.back();
     } catch (error) {
       console.error('❌ Error finishing session:', error);
-      cleanupSession();
+      await cleanupSession();
       router.back();
     }
   };
 
-  const cleanupSession = () => {
+  const cleanupSession = async () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    
+    // Stop TrackPlayer if it's running
+    try {
+      await TrackPlayer.stop();
+      await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
+      console.log('🛑 TrackPlayer stopped during cleanup');
+    } catch (error) {
+      console.warn('Failed to stop TrackPlayer during cleanup:', error);
+    }
+    
+    // Reset session state
+    setIsPlaying(false);
+    setIsInitializing(false);
+    sessionEndTime.current = 0;
   };
 
   // Play/Pause toggle
   const togglePlay = async () => {
     console.log('🎮 Toggle play pressed, hasAudio:', hasAudio, 'isPlaying:', isPlaying);
     
-    // Safety check: ensure session is properly initialized
+    // Prevent multiple rapid clicks while initializing
+    if (isInitializing) {
+      console.log('🎮 Session is already initializing, please wait...');
+      return;
+    }
+    
+    // If session not initialized yet, start it first
     if (!sessionEndTime.current || sessionEndTime.current <= Date.now()) {
-      console.warn('⚠️ Session not properly initialized, cannot play');
+      console.log('🎮 Session not initialized yet, starting session first...');
+      setIsInitializing(true);
+      try {
+        await startSession();
+        console.log('🎮 Session started, audio should now be playing');
+      } catch (error) {
+        console.error('❌ Failed to initialize session:', error);
+      } finally {
+        setIsInitializing(false);
+      }
       return;
     }
     
@@ -376,14 +402,14 @@ export default function SleepSessionScreen() {
   };
 
   // Back early handler
-  const goBackEarly = () => {
+  const goBackEarly = async () => {
     // Analytics tracking for separate stream
     track('session_abandoned', {
       coach_id: coach.id,
       class_id: cls.id,
     }).catch(() => {});
     
-    cleanupSession();
+    await cleanupSession();
     router.back();
   };
 
@@ -559,8 +585,8 @@ export default function SleepSessionScreen() {
               console.log('🎮 Play button pressed - calling togglePlay');
               togglePlay();
             }}
-            disabled={!hasAudio}
-            style={!hasAudio && styles.playButtonDisabled}
+            disabled={!hasAudio || isInitializing}
+            style={(!hasAudio || isInitializing) && styles.playButtonDisabled}
           >
             <LinearGradient
               colors={isPlaying ? ['#413A6D', '#221D55'] : ['#B3ACE9', '#5B45DD']}
@@ -574,7 +600,9 @@ export default function SleepSessionScreen() {
                 end={{ x: 1, y: 0 }}
                 style={styles.innerCircle}
               >
-                {isPlaying ? (
+                {isInitializing ? (
+                  <Clock size={32} color="white" />
+                ) : isPlaying ? (
                   <ExpoImage 
                   source={require('../../assets/images/pause-icon.png')}
                   style={styles.playIcon}
@@ -856,3 +884,4 @@ const styles = StyleSheet.create({
   // },
 
 }); 
+
