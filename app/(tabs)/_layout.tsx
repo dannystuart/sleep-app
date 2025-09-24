@@ -1,42 +1,45 @@
 import { Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Animated, Easing, InteractionManager } from 'react-native';
 import CustomBottomNavigation from '../../components/CustomBottomNavigation';
-import LoadingSpinner from '../../components/LoadingSpinner';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useApp } from '../../contexts/AppContext';
-import { startAnalyticsSession, track } from '../../lib/analytics';
+import { startAnalyticsSession } from '../../lib/analytics';
 
 export default function TabLayout() {
-  const [isUILoading, setIsUILoading] = useState(true);
   const { isLoading: isDataLoading } = useApp();
 
-  const handleLoadingComplete = () => {
-    setIsUILoading(false);
-  };
+  const [overlayVisible, setOverlayVisible] = useState(true);
+  const overlayOpacity = useState(new Animated.Value(1))[0];
+  const hasShownOnce = useState({ current: false })[0];
 
-  // Only show the app when both UI loading is complete AND data is ready
-  const shouldShowApp = !isUILoading && !isDataLoading;
-
+  // Crossfade overlay gate: show only on cold start and while data is loading/settling
   useEffect(() => {
-    // Let the LoadingSpinner control the duration
-    // The LoadingSpinner will call handleLoadingComplete when ready
-  }, []);
-
-  useEffect(() => {
-    // Start analytics session when app is ready (after loading completes)
-    if (shouldShowApp) {
-      startAnalyticsSession('cold');
+    // On first mount, keep overlay visible; once data is ready and any interactions settle, fade it out
+    if (!isDataLoading) {
+      InteractionManager.runAfterInteractions(() => {
+        Animated.timing(overlayOpacity, {
+          toValue: 0,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+        
+        // Move state updates outside of animation callback to avoid useInsertionEffect error
+        setTimeout(() => {
+          setOverlayVisible(false);
+          hasShownOnce.current = true;
+          startAnalyticsSession('cold');
+        }, 280); // Match animation duration
+      });
+    } else {
+      // If data is loading again (e.g., very first cold start), ensure overlay is shown
+      if (!hasShownOnce.current) {
+        setOverlayVisible(true);
+        overlayOpacity.setValue(1);
+      }
     }
-  }, [shouldShowApp]);
-
-  if (!shouldShowApp) {
-    return <LoadingSpinner 
-      message="Preparing your sleep app..." 
-      minDuration={2000} // Reduced minimum duration since we're waiting for real data
-      onComplete={handleLoadingComplete}
-    />;
-  }
+  }, [isDataLoading]);
 
   return (
     <SafeAreaProvider>
@@ -45,25 +48,20 @@ export default function TabLayout() {
           screenOptions={{ 
             headerShown: false, 
             tabBarStyle: { display: 'none' },
-            sceneStyle: { backgroundColor: 'transparent' }, // Transparent scene style
-            lazy: false, // Preload all screens
-            animation: 'none', // Disable default animations
+            sceneStyle: { backgroundColor: 'transparent' },
+            lazy: false,
+            animation: 'none',
           }}
         >
-          <Tabs.Screen
-            name="index"
-            options={{ title: 'Play' }}
-          />
-          <Tabs.Screen
-            name="diary"
-            options={{ title: 'Diary' }}
-          />
-          <Tabs.Screen
-            name="settings"
-            options={{ title: 'Settings' }}
-          />
+          <Tabs.Screen name="index" options={{ title: 'Play' }} />
+          <Tabs.Screen name="diary" options={{ title: 'Diary' }} />
+          <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
         </Tabs>
         <CustomBottomNavigation />
+
+        {overlayVisible && (
+          <Animated.View pointerEvents="auto" style={[StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }]} />
+        )}
       </View>
     </SafeAreaProvider>
   );
@@ -72,6 +70,9 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent', // Transparent to let root background show through
+    backgroundColor: 'transparent',
+  },
+  overlay: {
+    backgroundColor: '#0A0A0D',
   },
 });

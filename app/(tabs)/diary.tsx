@@ -147,7 +147,7 @@ export default function DiaryScreen() {
     const dateLabel = [
       d.toLocaleDateString('en-GB', { weekday: 'short' }),
       d.getDate(),
-      d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase(),
+      d.toLocaleDateString('en-GB', { month: 'short' }),
     ].join(' ');
 
     let statusText: string | null = null;
@@ -189,8 +189,7 @@ export default function DiaryScreen() {
   };
 
   const monthText = selectedDate
-    .toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-    .toUpperCase();
+    .toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 
   // Filter entries for the selected month
   const filteredEntries = entries.filter(entry => {
@@ -453,7 +452,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  navButton: {
+  navButton: { 
     marginHorizontal: 32,
     width: 40,
     height: 40,
@@ -469,7 +468,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '300',
-    letterSpacing: 6,
+    letterSpacing: 3,
     fontFamily: 'DMSans',
   },
 

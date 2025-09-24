@@ -59,7 +59,7 @@ export default function SettingsScreen() {
         <View style={[styles.mobileContainer, { maxWidth }]}>
           <View style={styles.content}>
             {/* Header */}
-            <Text style={styles.title}>Change sleep sequence</Text>
+            <Text style={styles.title}>Change sleep session</Text>
 
             {/* Coach Section */}
             <View style={styles.section}>
@@ -99,9 +99,9 @@ export default function SettingsScreen() {
             {/* Timer Section */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Timer</Text>
-              <Text style={styles.timerDescription}>
+              {/*<Text style={styles.timerDescription}>
                 You can change this during a sleep sequence as well.
-              </Text>
+              </Text>*/}
               <TouchableOpacity style={styles.glassCard} activeOpacity={0.8} onPress={handleTimerPress}>
                 <View style={styles.timerRow}>
                   <Text style={styles.timerText}>{timerSeconds} minutes</Text>
@@ -110,29 +110,6 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Dev Section */}
-            {__DEV__ && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Development</Text>
-                <TouchableOpacity
-                  style={[styles.glassCard, { marginTop: 8 }]}
-                  onPress={async () => {
-                    try {
-                      const { setStorageItem } = await import('../../lib/storage');
-                      await setStorageItem('hasOnboarded', '');
-                      console.log('🔄 Onboarding flag cleared, navigating to onboarding...');
-                      router.replace('/onboarding');
-                    } catch (error) {
-                      console.error('Error clearing onboarding flag:', error);
-                      alert('Error clearing onboarding flag. Please try again.');
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.className}>Reset onboarding (DEV)</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         </View>
       </SafeAreaView>

@@ -16,7 +16,6 @@ import { useApp } from '../contexts/AppContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 
-import { setStorageItem } from '../lib/storage';
 import { Stack } from 'expo-router';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -30,7 +29,7 @@ const BORDER_WIDTH = 1; // gradient stroke thickness
 
 export default function OnboardingClass() {
   const router = useRouter();
-  const { classes } = useApp();
+  const { classes, setClass } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
   const translateX = useSharedValue(0);
 
@@ -43,9 +42,9 @@ export default function OnboardingClass() {
     console.log('🎯 Class selected:', classId);
     
     try {
-      // Save selected class to local storage
-      await setStorageItem('classId', classId);
-      console.log('✅ Class saved to local storage:', classId);
+      // Save selected class using AppContext (which also saves to storage)
+      await setClass(classId);
+      console.log('✅ Class saved via AppContext:', classId);
       
       // Navigate to the onboarding streak screen with slide transition
       router.push('/onboarding-streak');
@@ -291,7 +290,8 @@ export default function OnboardingClass() {
                                   source={
                                     index === 1 ? require('../assets/images/onboarding/maths.png') :
                                     index === 2 ? require('../assets/images/onboarding/memory.png') :
-                                    require('../assets/images/onboarding/word.png')
+                                    index === 3 ? require('../assets/images/onboarding//word.png') :
+                                    require('../assets/images/onboarding/bulb.png')
                                   }
                                   style={styles.classIconImage}
                                   resizeMode="contain"

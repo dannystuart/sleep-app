@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Asset } from 'expo-asset';
 import ErrorBoundary from '../../components/ErrorBoundary';
@@ -242,13 +243,10 @@ export default function HomeScreen() {
                 onPress={handleLogoTap}
                 activeOpacity={0.8}
               >
-                <View style={styles.logoContent}>
-                  <Image 
-                    source={require('../../assets/images/brain-icon.png')}
-                    style={styles.brainIcon}
-                  />
-                  <Text style={styles.logo}>theta</Text>
-                </View>
+                <Image 
+                  source={require('../../assets/icon/theta-top-icon.png')}
+                  style={styles.logoImage}
+                />
               </TouchableOpacity>
 
               {/* Current Streak Card */}
@@ -329,6 +327,9 @@ export default function HomeScreen() {
                     <View style={styles.coachImageContainer}>
                       <Image 
                         source={{ uri: selectedCoach?.image_url || 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400' }}
+                        contentFit="cover"
+                        transition={0}
+                        cachePolicy="disk"
                         style={styles.coachImage}
                       />
                     </View>
@@ -422,25 +423,11 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 20,
   },
-  logoContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  brainIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#F99393',
-  },
-  logo: {
-    color: '#F99393',
-    fontSize: 32,
-    lineHeight: 32,
-    fontWeight: '200',
-    fontFamily: 'Dongle-Regular',
-    paddingTop: 18,
+  logoImage: {
+    width: 40,
+    height: 40,
   },
   streakCard: {
     backgroundColor: 'rgba(121, 75, 214, 0.1)',

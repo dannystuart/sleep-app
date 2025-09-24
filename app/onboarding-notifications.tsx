@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ImageBackground, Platform, TouchableOpacity, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground, Platform, TouchableOpacity, Dimensions, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { Stack } from 'expo-router';
@@ -11,6 +11,8 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
+import { ensureLocalNotifPermission } from '../lib/localNotifications';
+import * as Notifications from 'expo-notifications';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -21,9 +23,63 @@ export default function OnboardingNotifications() {
   const moonY = useSharedValue(screenHeight * 0.6); // Start below gradient
   const moonOpacity = useSharedValue(0);
 
-  const handleContinue = () => {
-    // Navigate to the onboarding completion screen
-    router.push('/onboarding-complete');
+  const handleContinue = async () => {
+    try {
+      console.log('🔔 Checking current notification permissions...');
+      
+      // First check current status
+      const { status: currentStatus } = await Notifications.getPermissionsAsync();
+      console.log('Current permission status:', currentStatus);
+      
+      if (currentStatus === 'granted') {
+        console.log('⚠️ Permissions already granted - showing custom popup instead');
+        
+        // Show a custom alert since native popup won't show
+        Alert.alert(
+          'Notifications',
+          'Would you like to receive notifications for your sleep check-ins?',
+          [
+            {
+              text: 'Not Now',
+              style: 'cancel',
+              onPress: () => {
+                console.log('❌ User chose Not Now');
+                router.push('/onboarding-complete');
+              }
+            },
+            {
+              text: 'Allow',
+              onPress: () => {
+                console.log('✅ User chose Allow');
+                router.push('/onboarding-complete');
+              }
+            }
+          ]
+        );
+      } else {
+        console.log('🔔 Requesting notification permissions...');
+        
+        // Request permissions (this will show native popup)
+        const { status } = await Notifications.requestPermissionsAsync({
+          ios: { allowAlert: true, allowBadge: true, allowSound: true },
+        });
+        
+        const granted = status === 'granted';
+        
+        if (granted) {
+          console.log('✅ Notification permissions granted');
+        } else {
+          console.log('❌ Notification permissions denied');
+        }
+        
+        // Navigate to completion screen regardless of permission result
+        router.push('/onboarding-complete');
+      }
+    } catch (error) {
+      console.error('Error requesting notification permissions:', error);
+      // Still navigate to completion screen even if there's an error
+      router.push('/onboarding-complete');
+    }
   };
 
   const handleBack = () => {
@@ -127,7 +183,7 @@ export default function OnboardingNotifications() {
         {/* Moon Image - Animated */}
         <Animated.View style={[styles.moonContainer, moonAnimatedStyle]}>
           <Image
-            source={require('../assets/images/onboarding/onboarding-moon.png')}
+            source={require('../assets/images/onboarding/onboarding-sun.png')}
             style={styles.moonImage}
             resizeMode="contain"
           />

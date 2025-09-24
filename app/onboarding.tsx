@@ -508,23 +508,24 @@ export default function Onboarding() {
         
         {/* Calm Brain Text */}
         <Animated.Text style={[styles.calmBrainText, calmBrainStyle]}>
-          This is a calm brain
+          This is your quieter brain
         </Animated.Text>
         
         {/* Theta Waves Text */}
         <Animated.Text style={[styles.thetaWavesText, thetaWavesStyle]}>
-          It's full of sleep-inducing{' '}
-          <Text style={styles.thetaHighlight}>Theta waves.</Text>
+          It's about to fall asleep.{' '}
+          
         </Animated.Text>
         
         {/* Theta State Text */}
         <Animated.Text style={[styles.thetaStateText, thetaStateStyle]}>
-          We call this Theta&nbsp;State{' '}
+          We call this{' '}
+          <Text style={styles.thetaHighlight}>Theta</Text>
         </Animated.Text>
         
         {/* Final Call-to-Action Text */}
         <Animated.Text style={[styles.ctaText, ctaTextStyle]}>
-          Now let's get you&nbsp;there
+          Shall we get you&nbsp;there?
         </Animated.Text>
         
         {/* Calm My Mind Button - Only render when final CTA is ready */}
@@ -538,7 +539,7 @@ export default function Onboarding() {
             }}
             activeOpacity={0.8}
           >
-            <Text style={styles.ctaButtonText}>Calm my mind</Text>
+            <Text style={styles.ctaButtonText}>Guide me to Theta</Text>
           </TouchableOpacity>
         )}
         
@@ -707,7 +708,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     color: 'white',
-    fontSize: 32,
+    fontSize: 24,
     fontFamily: 'PlusJakartaSans-Medium',
     textAlign: 'center',
     paddingHorizontal: 28,
@@ -765,6 +766,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
+    zIndex: 1001, // Higher than tapImageContainer to ensure it's touchable
   },
   ctaButtonText: {
     color: 'white',

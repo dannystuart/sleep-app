@@ -8,8 +8,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import { Asset } from "expo-asset";
-import * as Font from 'expo-font';
+
 // UUID helper function
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
@@ -30,53 +29,6 @@ const preloadCoachImages = async (coaches: Coach[]) => {
   }
 };
 
-// Background image preloading function
-const preloadBackgroundImages = async () => {
-  try {
-    console.log("🖼️ Preloading background images...");
-    
-    // Preload all background images used across the app
-    const backgroundImages = [
-      // Main background images
-      require("../assets/images/THETA-BG-TRANS.png"),
-      require("../assets/images/THETA-BG.png"),
-      
-      // Onboarding specific images
-      require("../assets/images/onboarding/onboarding-streak.png"),
-      require("../assets/images/onboarding/onboarding-gradient.png"),
-      require("../assets/images/onboarding/onboarding-moon.png"),
-      require("../assets/images/onboarding/maths.png"),
-      require("../assets/images/onboarding/memory.png"),
-      require("../assets/images/onboarding/word.png"),
-      
-      // Icon images
-      require("../assets/images/brain-icon.png"),
-      require("../assets/images/moon-icon.png"),
-      require("../assets/images/pause-icon.png"),
-      require("../assets/images/play-btn-icon.png"),
-      require("../assets/images/tap.png"),
-    ];
-    
-    // Preload all background images using Asset.loadAsync for local images
-    await Promise.all(backgroundImages.map(image => Asset.loadAsync(image)));
-    console.log("✅ Background images preloaded successfully");
-  } catch (error) {
-    console.warn("⚠️ Failed to preload background images:", error);
-  }
-};
-
-// Font preloading function (noop until you add actual fonts)
-const preloadFonts = async () => {
-  try {
-    await Font.loadAsync({
-      // e.g. 'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
-      // Add your font map above when ready
-    });
-    console.log('✅ Fonts preloaded (or noop if none configured)');
-  } catch (error) {
-    console.warn('⚠️ Failed to preload fonts:', error);
-  }
-};
 // Coach unlock milestones for UX copy (e.g., "Next coach unlock in N nights")
 // Actual unlock logic reads each coach's own unlock_streak field
 export const COACH_UNLOCK_MILESTONES = [3, 6, 8, 10];
@@ -166,24 +118,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (__DEV__) attachLocalDevGlobals();
   }, []);
 
-  // C) automatically schedule daily notifications on app launch (only once)
-  const [notificationsScheduled, setNotificationsScheduled] = useState(false);
-  
+  // C) automatically schedule daily notifications on app launch
   useEffect(() => {
-    if (notificationsScheduled) return; // Prevent multiple scheduling
-    
     (async () => {
       try {
         const results = await scheduleAllDailyNotifications();
         if (results.length > 0) {
           console.log('🔔 Daily notifications scheduled:', results);
-          setNotificationsScheduled(true);
         }
       } catch (error) {
         console.error('❌ Failed to schedule daily notifications:', error);
       }
     })();
-  }, [notificationsScheduled]); // Run once on app launch
+  }, []); // Run once on app launch
 
   // B) navigate on notification tap (works for both push + local)
   //    also handles cold start case
@@ -359,15 +306,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let selectedClassId = storedClassId || classes[0]?.id || '';
       const timerSeconds = storedTimer ? parseInt(storedTimer, 10) : 20;
 
-      console.log('🔧 AppContext: Loaded stored values:', {
-        storedCoachId,
-        storedClassId,
-        storedTimer,
-        selectedCoachId,
-        selectedClassId,
-        timerSeconds
-      });
-
       const foundCoach = coaches.find(c => c.id === selectedCoachId);
       const foundClass = classes.find(c => c.id === selectedClassId);
       
@@ -433,21 +371,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
 
-      // Preload assets that affect first paint; await to avoid first-frame jank
-      await Promise.all([
-        preloadCoachImages(coaches),
-        preloadBackgroundImages(),
-        preloadFonts(),
-      ]);
-      
-      console.log('🔧 AppContext: Setting final state:', {
-        selectedCoachId,
-        selectedClassId,
-        timerSeconds,
-        coachesCount: coaches.length,
-        classesCount: classes.length
-      });
-      
+      // Preload coach images for better performance
+      preloadCoachImages(coaches);
+
       setState({
         coaches,
         classes,
@@ -472,7 +398,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const setCoach = async (id: string) => {
-    console.log('🔧 AppContext: setCoach called with id:', id);
     try {
       // Check if this coach exists
       const coachExists = state.coaches.some(c => c.id === id);
@@ -505,7 +430,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const setClass = async (id: string) => {
-    console.log('🔧 AppContext: setClass called with id:', id);
     try {
       // Check if this class exists
       const classExists = state.classes.some(c => c.id === id);

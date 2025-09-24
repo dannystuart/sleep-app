@@ -68,7 +68,7 @@ export default function OnboardingStreak() {
 
           {/* Title */}
           <View style={styles.titleContainer}>
-            <Text style={styles.title}>Visit Thetaverse each night to grow your streak</Text>
+            <Text style={styles.title}>Grow your streak each&nbsp;night</Text>
           </View>
 
           {/* Description */}

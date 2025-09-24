@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image, ImageBackground, Platform } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ImageBackground, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue,
@@ -17,7 +18,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import LottieView from 'lottie-react-native';
 import { AudioPlayer, AudioSource, useAudioPlayer } from 'expo-audio';
-import { setStorageItem } from '../lib/storage';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -29,9 +29,194 @@ const STEP = CARD_WIDTH + CARD_MARGIN_H * 2;   // distance between left edges
 const MAX_TILT_DEG = 7; // off-canvas tilt for side cards
 const BORDER_WIDTH = 1; // gradient stroke thickness
 
+// Separate component for each coach card to properly isolate hooks
+const CoachCard = ({ 
+  coach, 
+  index, 
+  translateX, 
+  playingIndex, 
+  lottieOpacity, 
+  playButtonOpacity, 
+  onPreviewVoice, 
+  onSelectCoach 
+}: {
+  coach: any;
+  index: number;
+  translateX: any;
+  playingIndex: number | null;
+  lottieOpacity: any;
+  playButtonOpacity: any;
+  onPreviewVoice: (index: number, coach: any) => void;
+  onSelectCoach: (coachId: string) => void;
+}) => {
+  // Calculate the position of this card relative to the viewport center
+  const cardLeft = CARD_MARGIN_H + index * STEP; // actual left edge including the first margin
+
+  // Create animated style for this specific card
+  const cardAnimatedStyle = useAnimatedStyle(() => {
+    // Calculate how far this card is from the center
+    const distanceFromCenter = Math.abs(
+      (translateX.value + cardLeft + CARD_WIDTH / 2) - screenWidth / 2
+    );
+    const maxDistance = STEP; // one card away
+
+    // Determine if this card is left (-) or right (+) of centre
+    const centreX = screenWidth / 2;
+    const cardCentreX = translateX.value + cardLeft + CARD_WIDTH / 2;
+    const sideSign = cardCentreX < centreX ? -1 : 1; // left: -1 (tilt -deg), right: +1 (tilt +deg)
+
+    // Tilt grows with distance from centre up to MAX_TILT_DEG
+    const tiltMagnitude = interpolate(
+      distanceFromCenter,
+      [0, maxDistance],
+      [0, MAX_TILT_DEG],
+      'clamp'
+    );
+    const rotateZDeg = sideSign * tiltMagnitude;
+
+    // Scale based on distance from center (20% smaller when not centered)
+    const scale = interpolate(
+      distanceFromCenter,
+      [0, maxDistance],
+      [1, 0.8],
+      'clamp'
+    );
+
+    // Opacity based on distance from center
+    const opacity = interpolate(
+      distanceFromCenter,
+      [0, maxDistance],
+      [1, 0.6],
+      'clamp'
+    );
+
+    return {
+      transform: [
+        { perspective: 1000 },
+        { rotateZ: `${rotateZDeg}deg` },
+        { scale },
+      ],
+      opacity,
+    };
+  });
+
+  return (
+    <Animated.View 
+      key={coach.id} 
+      style={[
+        styles.shadowWrap,
+        cardAnimatedStyle,
+      ]}
+    >
+      <LinearGradient
+        colors={[ 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0.15)' ]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradientBorder}
+      >
+        <View style={styles.coachCard}>
+          {/* Inner shadow overlay */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.4)', 'transparent']}
+            locations={[0, 0.1]} // shadow fades out by 80% of the height
+            start={{ x: 0.5, y: 1 }}
+            end={{ x: 0.5, y: 0 }}
+            style={styles.innerShadow}
+          />
+
+          {/* Base image (unblurred, full card) */}
+          <Image
+            source={{ uri: coach.image_url }}
+            style={styles.coachImage}
+            defaultSource={require('../assets/images/brain-icon.png')}
+            contentFit="cover"
+            transition={0}
+            cachePolicy="disk"
+          />
+
+         {/* Progressive bottom-only blur overlay */}
+         <MaskedView
+           style={styles.progressiveBlurOverlay}
+           maskElement={
+             <LinearGradient
+               // Transparent at the top → opaque at the bottom (controls where blur shows)
+               colors={['rgba(0,0,0,0)', 'rgba(0,0,0,1)']}
+               // Adjust where the blur starts: 0.45 means ~45% from top
+               locations={[0.4, 1]}
+               start={{ x: 0.5, y: 0 }}
+               end={{ x: 0.5, y: 1 }}
+               style={styles.maskFill}
+             />
+           }
+         >
+           <Image
+             source={{ uri: coach.image_url }}
+             style={styles.coachImage}
+             defaultSource={require('../assets/images/brain-icon.png')}
+             blurRadius={Platform.select({ ios: 5, android: 5 })}
+             contentFit="cover"
+             transition={0}
+             cachePolicy="disk"
+           />
+         </MaskedView>
+         
+         {/* Gradient Overlay */}
+         <LinearGradient
+           colors={[
+             'rgba(0,0,0,0)',
+             '#F69197'
+           ]}
+           locations={[0.1169, 0.9262]}
+           start={{ x: 0.5, y: 0 }}
+           end={{ x: 0.5, y: 1 }}
+           style={styles.imageGradientOverlay}
+         />
+
+         {/* Name Tag - Overlay */}
+         <View style={styles.nameTagOverlay}>
+           <Text style={styles.nameTagText}>{coach.name}</Text>
+         </View>
+
+         {/* Action Buttons - Overlay */}
+         <View style={styles.actionButtonsOverlay}>
+           <TouchableOpacity
+             style={styles.previewButton}
+             onPress={() => onPreviewVoice(index, coach)}
+             activeOpacity={0.8}
+           >
+             {playingIndex === index ? (
+               <Animated.View style={{ opacity: lottieOpacity }}>
+                 <LottieView
+                   source={require('../assets/lottie/sound-wave.json')} // place your JSON here
+                   autoPlay
+                   loop
+                   style={styles.previewLottie}
+                   speed={1.5}
+                 />
+               </Animated.View>
+             ) : (
+               <Animated.View style={{ opacity: playButtonOpacity }}>
+                 <Play size={20} color="black" />
+               </Animated.View>
+             )}
+           </TouchableOpacity>
+
+           <TouchableOpacity
+             style={styles.selectButton}
+             onPress={() => onSelectCoach(coach.id)}
+           >
+             <Text style={styles.selectButtonText}>Select Coach</Text>
+           </TouchableOpacity>
+         </View>
+       </View>
+     </LinearGradient>
+   </Animated.View>
+  );
+};
+
 export default function OnboardingCoach() {
   const router = useRouter();
-  const { coaches, streak } = useApp() as any;
+  const { coaches, streak, setCoach } = useApp() as any;
 
   const [bestStreak, setBestStreak] = useState<number>(0);
 
@@ -84,9 +269,9 @@ export default function OnboardingCoach() {
     console.log('🎯 Coach selected:', coachId);
     
     try {
-      // Save selected coach to local storage
-      await setStorageItem('coachId', coachId);
-      console.log('✅ Coach saved to local storage:', coachId);
+      // Save selected coach using AppContext (which also saves to storage)
+      await setCoach(coachId);
+      console.log('✅ Coach saved via AppContext:', coachId);
       
       // Navigate to onboarding-class screen with slide transition
       router.push('/onboarding-class');
@@ -320,7 +505,7 @@ export default function OnboardingCoach() {
 
       {/* Title */}
       <View style={styles.titleContainer}>
-        <Text style={styles.title}>It's important to get started with your perfect sleep coach.</Text>
+        <Text style={styles.title}>It's important to get started with your perfect sleep coach</Text>
       </View>
 
       {/* Coach Carousel */}
@@ -328,162 +513,19 @@ export default function OnboardingCoach() {
         <View style={styles.carouselWrapper}>
           <PanGestureHandler onGestureEvent={gestureHandler}>
             <Animated.View style={[styles.carousel, carouselStyle]}>
-              {unlockedCoaches.map((coach: any, index: number) => {
-                // Calculate the position of this card relative to the viewport center
-                const cardLeft = CARD_MARGIN_H + index * STEP; // actual left edge including the first margin
-
-                return (
-                  <Animated.View 
-                    key={coach.id} 
-                    style={[
-                      styles.shadowWrap,
-                      useAnimatedStyle(() => {
-                        // Calculate how far this card is from the center
-                        const distanceFromCenter = Math.abs(
-                          (translateX.value + cardLeft + CARD_WIDTH / 2) - screenWidth / 2
-                        );
-                        const maxDistance = STEP; // one card away
-
-                        // Determine if this card is left (-) or right (+) of centre
-                        const centreX = screenWidth / 2;
-                        const cardCentreX = translateX.value + cardLeft + CARD_WIDTH / 2;
-                        const sideSign = cardCentreX < centreX ? -1 : 1; // left: -1 (tilt -deg), right: +1 (tilt +deg)
-
-                        // Tilt grows with distance from centre up to MAX_TILT_DEG
-                        const tiltMagnitude = interpolate(
-                          distanceFromCenter,
-                          [0, maxDistance],
-                          [0, MAX_TILT_DEG],
-                          'clamp'
-                        );
-                        const rotateZDeg = sideSign * tiltMagnitude;
-
-                        // Scale based on distance from center (20% smaller when not centered)
-                        const scale = interpolate(
-                          distanceFromCenter,
-                          [0, maxDistance],
-                          [1, 0.8],
-                          'clamp'
-                        );
-
-                        // Opacity based on distance from center
-                        const opacity = interpolate(
-                          distanceFromCenter,
-                          [0, maxDistance],
-                          [1, 0.6],
-                          'clamp'
-                        );
-
-                        return {
-                          transform: [
-                            { perspective: 1000 },
-                            { rotateZ: `${rotateZDeg}deg` },
-                            { scale },
-                          ],
-                          opacity,
-                        };
-                      }),
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={[ 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0.15)' ]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.gradientBorder}
-                    >
-                                             <View style={styles.coachCard}>
-                         {/* Inner shadow overlay */}
-                         <LinearGradient
-                           colors={['rgba(0,0,0,0.4)', 'transparent']}
-                           locations={[0, 0.1]} // shadow fades out by 80% of the height
-                           start={{ x: 0.5, y: 1 }}
-                           end={{ x: 0.5, y: 0 }}
-                           style={styles.innerShadow}
-                         />
-
-                         {/* Base image (unblurred, full card) */}
-                         <Image
-                           source={{ uri: coach.image_url }}
-                           style={styles.coachImage}
-                           defaultSource={require('../assets/images/brain-icon.png')}
-                         />
-
-                        {/* Progressive bottom-only blur overlay */}
-                        <MaskedView
-                          style={styles.progressiveBlurOverlay}
-                          maskElement={
-                            <LinearGradient
-                              // Transparent at the top → opaque at the bottom (controls where blur shows)
-                              colors={['rgba(0,0,0,0)', 'rgba(0,0,0,1)']}
-                              // Adjust where the blur starts: 0.45 means ~45% from top
-                              locations={[0.4, 1]}
-                              start={{ x: 0.5, y: 0 }}
-                              end={{ x: 0.5, y: 1 }}
-                              style={styles.maskFill}
-                            />
-                          }
-                        >
-                          <Image
-                            source={{ uri: coach.image_url }}
-                            style={styles.coachImage}
-                            defaultSource={require('../assets/images/brain-icon.png')}
-                            blurRadius={Platform.select({ ios: 5, android: 5 })}
-                          />
-                        </MaskedView>
-                        
-                        {/* Gradient Overlay */}
-                        <LinearGradient
-                          colors={[
-                            'rgba(0,0,0,0)',
-                            '#F69197'
-                          ]}
-                          locations={[0.1169, 0.9262]}
-                          start={{ x: 0.5, y: 0 }}
-                          end={{ x: 0.5, y: 1 }}
-                          style={styles.imageGradientOverlay}
-                        />
-
-                        {/* Name Tag - Overlay */}
-                        <View style={styles.nameTagOverlay}>
-                          <Text style={styles.nameTagText}>{coach.name}</Text>
-                        </View>
-
-                        {/* Action Buttons - Overlay */}
-                        <View style={styles.actionButtonsOverlay}>
-                          <TouchableOpacity
-                            style={styles.previewButton}
-                            onPress={() => handlePreviewVoice(index, coach)}
-                            activeOpacity={0.8}
-                          >
-                                                         {playingIndex === index ? (
-                               <Animated.View style={{ opacity: lottieOpacity }}>
-                                 <LottieView
-                                   source={require('../assets/lottie/sound-wave.json')} // place your JSON here
-                                   autoPlay
-                                   loop
-                                   style={styles.previewLottie}
-                                   speed={1.5}
-                                 />
-                               </Animated.View>
-                             ) : (
-                               <Animated.View style={{ opacity: playButtonOpacity }}>
-                                 <Play size={20} color="black" />
-                               </Animated.View>
-                             )}
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={styles.selectButton}
-                            onPress={() => handleCoachSelect(coach.id)}
-                          >
-                            <Text style={styles.selectButtonText}>Select Coach</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </LinearGradient>
-                  </Animated.View>
-                );
-              })}
+              {unlockedCoaches.map((coach: any, index: number) => (
+                <CoachCard
+                  key={coach.id}
+                  coach={coach}
+                  index={index}
+                  translateX={translateX}
+                  playingIndex={playingIndex}
+                  lottieOpacity={lottieOpacity}
+                  playButtonOpacity={playButtonOpacity}
+                  onPreviewVoice={handlePreviewVoice}
+                  onSelectCoach={handleCoachSelect}
+                />
+              ))}
             </Animated.View>
           </PanGestureHandler>
         </View>
@@ -504,7 +546,7 @@ export default function OnboardingCoach() {
 
       {/* Instructions */}
       <View style={styles.instructionsContainer}>
-        <Text style={styles.instructionText}>Their voice will guide  you to&nbsp;Thetaverse.</Text>
+        <Text style={styles.instructionText}>Their voice will guide you to Theta</Text>
         <Text style={styles.reassuranceText}>Don't worry you can change coach later</Text>
       </View>
     </View>
@@ -770,7 +812,7 @@ const styles = StyleSheet.create({
   instructionsContainer: {
     paddingHorizontal: 40,
     paddingBottom: 60,
-    alignItems: 'flex-start',
+    alignItems: 'center',
     zIndex: 1000,
   },
   instructionText: {

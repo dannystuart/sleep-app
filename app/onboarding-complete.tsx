@@ -59,8 +59,8 @@ export default function OnboardingComplete() {
         <View style={styles.contentContainer}>
           {/* Welcome Message */}
           <View style={styles.messageContainer}>
-            <Text style={styles.mainMessage}>You're all set.</Text>
-            <Text style={styles.welcomeText}>Welcome to the Thetaverse.</Text>
+            <Text style={styles.mainMessage}>You're all set</Text>
+            <Text style={styles.welcomeText}>Welcome to Theta</Text>
           </View>
 
           {/* Play Button */}
@@ -76,7 +76,7 @@ export default function OnboardingComplete() {
                 end={{ x: 1, y: 1 }}
                 style={styles.gradientButton}
               >
-                <Text style={styles.playButtonText}>Play your sleep session</Text>
+                <Text style={styles.playButtonText}>Let's get to sleep</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>

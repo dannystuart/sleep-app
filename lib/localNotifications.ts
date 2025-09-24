@@ -113,6 +113,10 @@ export async function scheduleAllDailyNotifications() {
     return [];
   }
 
+  // First, cancel all existing notifications to prevent duplicates
+  await Notifications.cancelAllScheduledNotificationsAsync();
+  console.log('🧹 Cancelled all existing notifications to prevent duplicates');
+
   const enabledNotifications = getEnabledNotifications();
   const results = [];
 
@@ -153,15 +157,24 @@ export function attachLocalDevGlobals() {
     test: scheduleOneOffIn,
     list: Notifications.getAllScheduledNotificationsAsync,
     config: DAILY_NOTIFICATIONS, // Access to config for debugging
+    // New helper to check current notifications
+    check: async () => {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      console.log('📋 Currently scheduled notifications:', scheduled.length);
+      scheduled.forEach((n, i) => {
+        console.log(`  ${i + 1}. ${n.content.title} - ${n.content.body}`);
+      });
+      return scheduled;
+    },
   };
   // Usage in console:
-  //   await __thetaLocal.perm()
-  //   await __thetaLocal.test(5)
+  //   await __thetaLocal.perm()               // Check notification permissions
+  //   await __thetaLocal.test(5)             // Test notification in 5 seconds
   //   await __thetaLocal.scheduleAll()        // Schedule all enabled notifications
   //   await __thetaLocal.scheduleById('bedtime') // Schedule specific notification
   //   await __thetaLocal.bedtime()            // Legacy: schedule bedtime
   //   await __thetaLocal.morning()            // Legacy: schedule morning
-  //   await __thetaLocal.list()               // List scheduled notifications
-  //   await __thetaLocal.cancel()             // Cancel all
+  //   await __thetaLocal.check()              // Check current scheduled notifications
+  //   await __thetaLocal.cancel()             // Cancel all notifications
   //   __thetaLocal.config                     // View notification config
 }

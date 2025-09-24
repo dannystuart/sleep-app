@@ -6,18 +6,37 @@ import {
   Text,
   TouchableOpacity,
   InteractionManager,
-  ImageBackground,
-  Image,
+  AppState,
+  PanResponder,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Asset } from 'expo-asset';
-import { AudioPlayer, AudioSource, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+// Safe TrackPlayer import with Expo Go fallback
+let TrackPlayer: any = null;
+let TrackPlayerState: any = null;
+
+const isExpoGo = typeof __DEV__ !== 'undefined' && __DEV__ && !(global as any).nativeCallSyncHook;
+
+if (!isExpoGo) {
+  try {
+    const trackPlayerModule = require('react-native-track-player');
+    TrackPlayer = trackPlayerModule.default;
+    TrackPlayerState = trackPlayerModule.State;
+  } catch (error) {
+    console.warn('TrackPlayer not available, using fallback');
+  }
+} else {
+  console.warn('Running in Expo Go, TrackPlayer not available');
+}
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from '../components/SafeAreaView';
-import { useApp } from '../contexts/AppContext';
-import { ChevronLeft, Play, Pause, SkipBack, Clock, PauseCircle } from 'lucide-react-native';
+import { SafeAreaView } from '../../components/SafeAreaView';
+import { useApp } from '../../contexts/AppContext';
+import { ChevronDown, Play, Pause, SkipBack, Clock, PauseCircle, ArrowDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { track } from '../lib/analytics';
+import { track } from '../../lib/analytics';
 
 export default function SleepSessionScreen() {
   const router = useRouter();
@@ -45,11 +64,11 @@ export default function SleepSessionScreen() {
 
   const bgOpacity = useRef(new Animated.Value(0)).current;
   const [position, setPosition] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioPosition, setAudioPosition] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
   
-  // expo-audio player
-  const player = useAudioPlayer(audioUrl as AudioSource);
-  const status = useAudioPlayerStatus(player);
+  // TrackPlayer state
   const timerRef = useRef<ReturnType<typeof setInterval>|null>(null);
   const sessionEndTime = useRef<number>(0);
   const pausedAtTime = useRef<number>(0);
@@ -77,7 +96,7 @@ export default function SleepSessionScreen() {
 
   // 1) preload background
   useEffect(() => {
-    Asset.loadAsync(require('../assets/images/THETA-BG.png'));
+    Asset.loadAsync(require('../../assets/images/THETA-BG.png'));
   }, []);
 
   // 2) defer session setup until after nav animation
@@ -89,6 +108,44 @@ export default function SleepSessionScreen() {
     };
   }, []);
 
+  // AppState guard - if app wakes after timer elapsed, end immediately
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (state) => {
+      if (state === 'active') {
+        // Sync with TrackPlayer state when app becomes active
+        if (hasAudio && TrackPlayer) {
+          try {
+            const trackPlayerState = await TrackPlayer.getState();
+            const isCurrentlyPlaying = trackPlayerState === TrackPlayerState.Playing;
+            console.log('📱 App became active, syncing state:', isCurrentlyPlaying);
+            
+            if (isCurrentlyPlaying !== isPlaying) {
+              setIsPlaying(isCurrentlyPlaying);
+              if (isCurrentlyPlaying) {
+                resumeTimer();
+              } else {
+                pauseTimer();
+              }
+            }
+          } catch (error) {
+            console.warn('Failed to sync state on app active:', error);
+          }
+        }
+        
+        // Check if timer has elapsed
+        if (sessionEndTime.current && Date.now() >= sessionEndTime.current) {
+          if (TrackPlayer) {
+            try { 
+              await TrackPlayer.stop(); 
+            } catch {}
+          }
+          finishSession();
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [hasAudio, isPlaying]);
+
   // fade in on load **or** error
   const onBgLoad = () => animateIn();
   const onBgError = () => {
@@ -96,7 +153,11 @@ export default function SleepSessionScreen() {
     animateIn();
   };
   const animateIn = () => {
-    Animated.timing(bgOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    Animated.timing(bgOpacity, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
   };
 
   // session logic - load & play one track
@@ -129,32 +190,100 @@ export default function SleepSessionScreen() {
         return;
       }
       
-      // 3. Load & play the single MP3
+      // 3. Queue single track with TrackPlayer
       console.log('🎵 Loading audio:', audioUrl);
-      if (player) {
-        player.play();
+      if (TrackPlayer) {
+        try {
+          await TrackPlayer.reset();
+          await TrackPlayer.add({
+            id: `${coach.id}-${cls.id}`,
+            url: audioUrl!,
+            title: `${coach.name} — ${getClassDisplayName()}`,
+            artist: 'Theta',
+            artwork: coach.image_url || undefined,
+          });
+          await TrackPlayer.play();
+          setIsPlaying(true);
+          console.log('✅ TrackPlayer started successfully');
+        } catch (trackPlayerError) {
+          console.warn('TrackPlayer failed, falling back to timer-only session:', trackPlayerError);
+          // Continue with timer-only session - audio will not play but timer will work
+          setIsPlaying(true); // Set playing state for UI even without audio
+        }
+      } else {
+        console.warn('TrackPlayer not available, running timer-only session');
+        setIsPlaying(true); // Set playing state for UI even without audio
       }
       
-      // 5. Start countdown timer
+      // 4. Set absolute end time (ms since epoch)
       sessionEndTime.current = Date.now() + timerSeconds * 60_000;
+      await AsyncStorage.setItem('theta_sleep_end_ts', String(sessionEndTime.current));
+      
+      // 5. Session completion notification removed - not needed for user experience
+      
+      // 6. Start countdown timer
       console.log('⏰ Session end time set to:', new Date(sessionEndTime.current).toLocaleTimeString());
       startTimer();
+      console.log('✅ Session started successfully');
     } catch (error) {
       console.error('❌ Error starting session:', error);
       // Fallback: start timer without audio
       sessionEndTime.current = Date.now() + timerSeconds * 60_000;
+      await AsyncStorage.setItem('theta_sleep_end_ts', String(sessionEndTime.current));
       startTimer();
+      console.log('✅ Fallback session started (timer only)');
     }
   };
 
-  // Get audio status from expo-audio
-  const isPlaying = status?.playing ?? false;
-  const audioPosition = (status?.currentTime ?? 0) * 1000; // Convert seconds to milliseconds
-  const length = (status?.duration ?? 0) * 1000; // Convert seconds to milliseconds
+  // TrackPlayer audio position tracking and state sync
+  useEffect(() => {
+    if (!hasAudio || !TrackPlayer) return;
+    
+    const updatePosition = async () => {
+      try {
+        const position = await TrackPlayer.getPosition();
+        const duration = await TrackPlayer.getDuration();
+        setAudioPosition(position * 1000); // Convert to milliseconds
+        setAudioDuration(duration * 1000); // Convert to milliseconds
+      } catch (error) {
+        console.warn('Failed to get audio position:', error);
+      }
+    };
+    
+    // Sync playback state with external controls
+    const syncPlaybackState = async () => {
+      try {
+        const state = await TrackPlayer.getState();
+        const isCurrentlyPlaying = state === TrackPlayerState.Playing;
+        
+        if (isCurrentlyPlaying !== isPlaying) {
+          console.log('🔄 Syncing playback state:', isCurrentlyPlaying);
+          setIsPlaying(isCurrentlyPlaying);
+          
+          // Sync timer state
+          if (isCurrentlyPlaying) {
+            resumeTimer();
+          } else {
+            pauseTimer();
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to sync playback state:', error);
+      }
+    };
+    
+    const interval = setInterval(() => {
+      updatePosition();
+      syncPlaybackState();
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [hasAudio, isPlaying]);
 
   // Finish & cleanup when timer ends
   const finishSession = async () => {
     console.log('🎯 finishSession called!');
+    console.log('🎯 Stack trace:', new Error().stack);
     try {
       clearInterval(timerRef.current!);
       console.log('📊 Logging session event...');
@@ -171,6 +300,17 @@ export default function SleepSessionScreen() {
         class_id: cls.id,
         timer_seconds: timerSeconds,
       }).catch(() => {});
+
+      // Stop TrackPlayer and clear stored timer
+      if (TrackPlayer) {
+        try {
+          await TrackPlayer.stop();
+        } catch (error) {
+          console.warn('Failed to stop TrackPlayer:', error);
+        }
+      }
+      setIsPlaying(false);
+      await AsyncStorage.removeItem('theta_sleep_end_ts');
 
       console.log('🔥 Updating streak and diary...');
       // NEW: update streak + diary
@@ -194,34 +334,62 @@ export default function SleepSessionScreen() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    if (player) {
-      try {
-        player.pause();
-      } catch (error) {
-        console.warn('Failed to pause player during cleanup:', error);
-      }
-    }
   };
 
   // Play/Pause toggle
-  const togglePlay = () => {
-    if (!player) {
+  const togglePlay = async () => {
+    console.log('🎮 Toggle play pressed, hasAudio:', hasAudio, 'isPlaying:', isPlaying);
+    
+    // Safety check: ensure session is properly initialized
+    if (!sessionEndTime.current || sessionEndTime.current <= Date.now()) {
+      console.warn('⚠️ Session not properly initialized, cannot play');
+      return;
+    }
+    
+    if (!hasAudio) {
       console.warn('No audio available to play');
       return;
     }
     
-    try {
-      if (isPlaying) {
-        player.pause();
-        setIsPaused(true);
-        pauseTimer();
-      } else {
-        player.play();
-        setIsPaused(false);
-        resumeTimer();
+    if (TrackPlayer) {
+      try {
+        const state = await TrackPlayer.getState();
+        console.log('🎵 TrackPlayer state:', state);
+        if (state === TrackPlayerState.Playing) {
+          await TrackPlayer.pause();
+          setIsPlaying(false);
+          pauseTimer();
+          console.log('⏸️ TrackPlayer paused');
+        } else {
+          await TrackPlayer.play();
+          setIsPlaying(true);
+          resumeTimer();
+          console.log('▶️ TrackPlayer playing');
+        }
+      } catch (error) {
+        console.warn('Failed to toggle play/pause:', error);
+        // Fallback: just toggle the timer (audio won't play but timer will work)
+        if (isPlaying) {
+          setIsPlaying(false);
+          pauseTimer();
+          console.log('⏸️ Timer paused (TrackPlayer fallback)');
+        } else {
+          setIsPlaying(true);
+          resumeTimer();
+          console.log('▶️ Timer playing (TrackPlayer fallback)');
+        }
       }
-    } catch (error) {
-      console.warn('Failed to toggle play/pause:', error);
+    } else {
+      // TrackPlayer not available, just toggle the timer
+      if (isPlaying) {
+        setIsPlaying(false);
+        pauseTimer();
+        console.log('⏸️ Timer paused (no TrackPlayer)');
+      } else {
+        setIsPlaying(true);
+        resumeTimer();
+        console.log('▶️ Timer playing (no TrackPlayer)');
+      }
     }
   };
 
@@ -237,7 +405,7 @@ export default function SleepSessionScreen() {
     router.back();
   };
 
-  const progress = length ? audioPosition/length : 0;
+  const progress = audioDuration ? audioPosition/audioDuration : 0;
   const fmt = (ms:number) => {
     const s=Math.floor(ms/1000), m=Math.floor(s/60), sec=s%60;
     return `${m}:${sec.toString().padStart(2,'0')}`;
@@ -246,6 +414,13 @@ export default function SleepSessionScreen() {
   // Timer management functions
   const startTimer = () => {
     console.log('⏰ Starting timer for', timerSeconds, 'minutes');
+    
+    // Safety check: ensure session is properly initialized
+    if (!sessionEndTime.current || sessionEndTime.current <= Date.now()) {
+      console.warn('⚠️ Cannot start timer - session not properly initialized');
+      return;
+    }
+    
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
@@ -264,9 +439,11 @@ export default function SleepSessionScreen() {
         finishSession();
       }
     }, 500);
+    console.log('✅ Timer started successfully');
   };
 
   const pauseTimer = () => {
+    console.log('⏸️ Pausing timer');
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -275,18 +452,26 @@ export default function SleepSessionScreen() {
   };
 
   const resumeTimer = () => {
+    console.log('▶️ Resuming timer');
+    
+    // Safety check: ensure session is properly initialized
+    if (!sessionEndTime.current || sessionEndTime.current <= Date.now()) {
+      console.warn('⚠️ Cannot resume timer - session not properly initialized');
+      return;
+    }
+    
     const pauseDuration = Date.now() - pausedAtTime.current;
     sessionEndTime.current += pauseDuration;
     startTimer();
   };
 
   // Seek functionality
-  const seekTo = (seekPercentage: number) => {
-    if (!player || !length) return;
+  const seekTo = async (seekPercentage: number) => {
+    if (!hasAudio || !audioDuration || !TrackPlayer) return;
     
     try {
-      const seekTime = (seekPercentage / 100) * length;
-      player.seekTo(seekTime / 1000); // Convert milliseconds to seconds
+      const seekTime = (seekPercentage / 100) * audioDuration;
+      await TrackPlayer.seekTo(seekTime / 1000); // Convert milliseconds to seconds
       // Don't update session position - that should continue based on real time
     } catch (error) {
       console.warn('Failed to seek audio:', error);
@@ -299,27 +484,66 @@ export default function SleepSessionScreen() {
     seekTo(Math.max(0, Math.min(100, seekPercentage)));
   };
 
+  // Simple swipe down gesture handler for Expo Go compatibility
+  const swipeDownGestureHandler = (event: any) => {
+    const { translationY, state } = event.nativeEvent;
+    
+    if (state === State.END) {
+      console.log('🔄 Gesture ended, translationY:', translationY);
+      // If user swiped down more than 50px, close the overlay
+      if (translationY > 50) {
+        console.log('🔄 Closing overlay via swipe');
+        goBackEarly();
+      }
+    }
+  };
+
+  // Fallback PanResponder for better Expo Go compatibility
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (evt, gestureState) => {
+      // Only respond to vertical swipes
+      return Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && Math.abs(gestureState.dy) > 10;
+    },
+    onPanResponderMove: (evt, gestureState) => {
+      console.log('🔄 PanResponder move:', gestureState.dy);
+    },
+    onPanResponderRelease: (evt, gestureState) => {
+      console.log('🔄 PanResponder release, dy:', gestureState.dy);
+      // If user swiped down more than 50px, close the overlay
+      if (gestureState.dy > 50) {
+        console.log('🔄 Closing overlay via PanResponder swipe');
+        goBackEarly();
+      }
+    },
+  });
+
   return (
-    <View style={{flex:1}}>
-      {/* fallback solid bg */}
-      <View style={styles.fallback} />
+    <PanGestureHandler onGestureEvent={swipeDownGestureHandler}>
+      <View style={styles.rootContainer} {...panResponder.panHandlers}>
+        {/* fallback solid bg */}
+        <View style={styles.fallback} />
 
-      {/* animated image on top */}
-      <ImageBackground
-        source={require('../assets/images/THETA-BG.png')}
-        style={StyleSheet.absoluteFill}
-        onLoad={onBgLoad}
-        onError={onBgError}
-        resizeMode="cover"
-      >
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity:bgOpacity }]} />
-      </ImageBackground>
+        {/* animated image on top (fades in over solid fallback) */}
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: bgOpacity }]}>
+          <ExpoImage
+            source={require('../../assets/images/THETA-BG.png')}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={0}             // disable built-in fade
+            cachePolicy="disk"         // keep cached on disk
+            onLoad={onBgLoad}
+            onError={onBgError}
+          />
+        </Animated.View>
 
-      <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container}>
         {/* HEADER */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={goBackEarly}>
-            <ChevronLeft color="white" size={24}/>
+          <TouchableOpacity onPress={() => {
+            console.log('🔄 Arrow pressed - closing overlay');
+            goBackEarly();
+          }}>
+            <ArrowDown color="white" size={24}/>
           </TouchableOpacity>
           <Text style={styles.title}>Sleep Session</Text>
           <View style={{width:24}}/>
@@ -328,8 +552,11 @@ export default function SleepSessionScreen() {
         {/* PROFILE SECTION */}
         <View style={styles.profileSection}>
           <View style={styles.profileImageContainer}>
-            <Image 
+            <ExpoImage 
               source={{ uri: coach.image_url || 'https://via.placeholder.com/200x200' }}
+              contentFit="cover"
+              transition={0}
+              cachePolicy="disk"
               style={styles.profileImage}
             />
             <View style={styles.nameTag}>
@@ -356,9 +583,12 @@ export default function SleepSessionScreen() {
         <View style={styles.playButtonSection}>
           <TouchableOpacity 
             activeOpacity={0.8} 
-            onPress={togglePlay}
-            disabled={!hasAudio || !player}
-            style={(!hasAudio || !player) && styles.playButtonDisabled}
+            onPress={() => {
+              console.log('🎮 Play button pressed - calling togglePlay');
+              togglePlay();
+            }}
+            disabled={!hasAudio}
+            style={!hasAudio && styles.playButtonDisabled}
           >
             <LinearGradient
               colors={isPlaying ? ['#413A6D', '#221D55'] : ['#B3ACE9', '#5B45DD']}
@@ -373,13 +603,13 @@ export default function SleepSessionScreen() {
                 style={styles.innerCircle}
               >
                 {isPlaying ? (
-                  <Image 
-                  source={require('../assets/images/pause-icon.png')}
+                  <ExpoImage 
+                  source={require('../../assets/images/pause-icon.png')}
                   style={styles.playIcon}
                 />
                 ) : (
-                  <Image 
-                    source={require('../assets/images/play-btn-icon.png')}
+                  <ExpoImage 
+                    source={require('../../assets/images/play-btn-icon.png')}
                     style={styles.playIcon}
                   />
                 )}
@@ -409,7 +639,7 @@ export default function SleepSessionScreen() {
           </TouchableOpacity>
           <View style={styles.progressTimer}>
           <Text style={styles.timeText}>{fmt(audioPosition)}</Text>
-          <Text style={styles.fullText}>{fmt(length)}</Text>
+          <Text style={styles.fullText}>{fmt(audioDuration)}</Text>
           </View>
         </View>
 
@@ -453,11 +683,16 @@ export default function SleepSessionScreen() {
           </TouchableOpacity>
         </View> */}
       </SafeAreaView>
-    </View>
+      </View>
+    </PanGestureHandler>
   );
 }
 
 const styles = StyleSheet.create({
+  rootContainer: {
+    flex: 1,
+    backgroundColor: '#000', // Ensure consistent background
+  },
   fallback: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000',

@@ -29,7 +29,8 @@
       "infoPlist": {
         "UIBackgroundModes": [
           "fetch",
-          "remote-notification"
+          "remote-notification",
+          "audio"
         ],
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -39,8 +40,12 @@
       "versionCode": 1,
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
-      ]
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "WAKE_LOCK",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
+      "useNextNotificationsApi": true
     },
     "web": {
       "bundler": "metro",

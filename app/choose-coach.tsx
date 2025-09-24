@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from '../components/SafeAreaView';
 import { useApp } from '../contexts/AppContext';
@@ -64,7 +65,13 @@ export default function ChooseCoachScreen() {
       onPress={() => handleCoachSelect(item.id)}
       activeOpacity={0.8}
     >
-      <Image source={{ uri: item.image_url }} style={styles.coachImage} />
+      <Image 
+        source={{ uri: item.image_url }} 
+        style={styles.coachImage}
+        contentFit="cover"
+        transition={0}
+        cachePolicy="disk"
+      />
       <View style={styles.coachInfo}>
         <Text style={styles.coachName}>{item.name}</Text>
         {item.locale && item.style && (
