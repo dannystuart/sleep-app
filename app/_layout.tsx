@@ -21,12 +21,13 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { enableScreens } from 'react-native-screens';
-import { View, ImageBackground, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '../contexts/AppContext';
 import { getStorageItem } from '../lib/storage';
 import { setupPlayerOnce } from '../lib/audio/player';
 import TrackPlayer from 'react-native-track-player';
+import { ScreenBackground } from '../components/ScreenBackground';
 
 // Re-enable native screens so React Navigation can hide inactive tabs
 enableScreens();
@@ -119,19 +120,11 @@ function AppContent() {
           translucent={true}
         />
 
-        {/* 
-          ImageBackground at root, covers full screen including status bar and safe areas
-        */}
-        <ImageBackground
-          source={require('../assets/images/THETA-BG.png')}
-          style={styles.background}
-          resizeMode="cover"
-        >
-          {/*
-            SafeAreaView with transparent background
-            edges ['top','bottom'] means children are padded,
-            but the background image still shows under the insets.
-          */}
+        {/* Background layers */}
+        <View style={styles.backgroundContainer}>
+          <View style={styles.backgroundBase} />
+          <View style={styles.backgroundGradient} />
+          <ScreenBackground source={require('../assets/images/THETA-BG.png')} fadeMs={0} />
           <SafeAreaView
             style={styles.safeArea}
             edges={['top', 'bottom']}
@@ -180,7 +173,7 @@ function AppContent() {
                      <Stack.Screen name="+not-found" />
             </Stack>
           </SafeAreaView>
-        </ImageBackground>
+        </View>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
@@ -197,10 +190,17 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  background: {
+  backgroundContainer: {
     flex: 1,
-    // ensures the image sits behind status bar and home indicator
+  },
+  backgroundBase: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#171221',
+  },
+  backgroundGradient: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#171221',
+    opacity: 0.6,
   },
   safeArea: {
     flex: 1,
