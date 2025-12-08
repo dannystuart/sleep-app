@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Play, Pause, X } from 'lucide-react-native';
@@ -34,12 +34,21 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [manualHide, setManualHide] = useState(false);
+  const manualHideUntilRef = useRef(0);
   const slideAnim = useState(new Animated.Value(100))[0];
 
   // Check if there's an active session
   useEffect(() => {
     const checkActiveSession = async () => {
       try {
+        // Hard guard: if we recently hid manually, keep hidden
+        if (manualHideUntilRef.current > Date.now()) {
+          setIsVisible(false);
+          return;
+        } else if (manualHide) {
+          setManualHide(false);
+        }
+
         const active = await isSleepSessionActive();
         if (!active) {
           setManualHide(false);
@@ -142,6 +151,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
   const stopSession = async () => {
     try {
       setManualHide(true); // prevent pop-back while stopping
+      manualHideUntilRef.current = Date.now() + 6000; // keep hidden for a short window
       await stopSleepSession();
       setIsPlaying(false);
       Animated.timing(slideAnim, {
