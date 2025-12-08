@@ -1,13 +1,29 @@
 import { Tabs } from 'expo-router';
-import { View, StyleSheet, Animated, Easing, InteractionManager } from 'react-native';
+import { View, StyleSheet, Animated, Easing, InteractionManager, Text } from 'react-native';
 import CustomBottomNavigation from '../../components/CustomBottomNavigation';
+import MiniPlayer from '../../components/MiniPlayer';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useApp } from '../../contexts/AppContext';
 import { startAnalyticsSession } from '../../lib/analytics';
 
 export default function TabLayout() {
-  const { isLoading: isDataLoading } = useApp();
+  // Safety check for AppProvider context
+  let appContext;
+  try {
+    appContext = useApp();
+  } catch (error) {
+    // If context is not available, show loading state
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, backgroundColor: '#171221', justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: 'white', fontSize: 16, fontFamily: 'DMSans' }}>Loading...</Text>
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
+  const { isLoading: isDataLoading } = appContext;
 
   const [overlayVisible, setOverlayVisible] = useState(true);
   const overlayOpacity = useState(new Animated.Value(1))[0];
@@ -57,6 +73,7 @@ export default function TabLayout() {
           <Tabs.Screen name="diary" options={{ title: 'Diary' }} />
           <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
         </Tabs>
+        <MiniPlayer />
         <CustomBottomNavigation />
 
         {overlayVisible && (

@@ -209,10 +209,23 @@ The app uses Expo AV for audio playback:
 
 ## Development
 
+### Development Builds (Recommended - Free!)
+
+For local testing without paying for cloud builds, use **Development Builds**. See [DEVELOPMENT_BUILDS.md](./DEVELOPMENT_BUILDS.md) for complete instructions.
+
+**Quick Start:**
+1. Build once: `npx expo run:ios --device` (iOS) or `npx expo run:android --device` (Android)
+2. Run dev server: `npm run dev`
+3. Scan QR code and develop for free!
+
 ### Running the App
 
 ```bash
+# Development server with dev client
 npm run dev
+
+# Development server with cleared cache
+npm run dev:clear
 ```
 
 ### Building for Production
@@ -226,6 +239,16 @@ npx expo run:android
 
 # Web
 npm run build:web
+```
+
+### Local EAS Builds (If you need installable files)
+
+```bash
+# iOS (.ipa file)
+npm run build:ios:local
+
+# Android (.apk file)
+npm run build:android:local
 ```
 
 ## Environment Setup

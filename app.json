@@ -7,7 +7,7 @@
     "icon": "./assets/icon/theta-app-icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash/splash-logo.png",
       "backgroundColor": "#171221",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.theta.sleepapp",
-      "buildNumber": "1",
+      "buildNumber": "15",
       "splash": {
         "image": "./assets/splash/splash-logo.png",
         "backgroundColor": "#171221",
@@ -37,7 +37,7 @@
     },
     "android": {
       "package": "com.theta.sleepapp",
-      "versionCode": 1,
+      "versionCode": 3,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",

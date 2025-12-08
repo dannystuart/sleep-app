@@ -26,14 +26,23 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '../contexts/AppContext';
 import { getStorageItem } from '../lib/storage';
 import { setupPlayerOnce } from '../lib/audio/player';
-import TrackPlayer from 'react-native-track-player';
+import { TrackPlayer, isTrackPlayerSupported } from '../lib/audio/trackPlayerSafe';
 import { ScreenBackground } from '../components/ScreenBackground';
 
 // Re-enable native screens so React Navigation can hide inactive tabs
 enableScreens();
 
 // Register the playback service (must be at top-level, not inside a component)
-TrackPlayer.registerPlaybackService(() => require('../service/track-player-service').default);
+// Only register if TrackPlayer is available (not in Expo Go)
+// Use a function call to check support lazily
+try {
+  if (isTrackPlayerSupported() && TrackPlayer && typeof TrackPlayer.registerPlaybackService === 'function') {
+    TrackPlayer.registerPlaybackService(() => require('../service/track-player-service').default);
+  }
+} catch (error) {
+  // Silently fail in Expo Go - this is expected
+  // Don't log to avoid noise in Expo Go
+}
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();

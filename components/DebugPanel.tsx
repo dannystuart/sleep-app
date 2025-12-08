@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useApp } from '../contexts/AppContext';
+import { isTrackPlayerSupported, getDetectionLog, getLoadError } from '../lib/audio/trackPlayerSafe';
 import { setStorageItem } from '../lib/storage';
 import { useRouter } from 'expo-router';
 import type { DiaryEntry } from '../types';
@@ -10,9 +11,15 @@ interface DebugPanelProps {
 }
 
 export const DebugPanel: React.FC<DebugPanelProps> = ({ onClose }) => {
-  const { diary, streak, devPushAnnouncement, devShowTestAnnouncement, announcements, coaches, scheduleDailyReminder, scheduleBedtimeReminder, scheduleMorningReminder, scheduleAllDailyNotifications, cancelAllLocalReminders, ensureLocalNotifPermission } = useApp() as any;
+  const { diary, streak, devPushAnnouncement, devShowTestAnnouncement, announcements, coaches, scheduleDailyReminder, scheduleBedtimeReminder, scheduleMorningReminder, scheduleAllDailyNotifications, cancelAllLocalReminders, ensureLocalNotifPermission, selectedCoachId, selectedClassId, sessionAudio } = useApp() as any;
   const router = useRouter();
   const [streakData, setStreakData] = React.useState<any>(null);
+  const trackPlayerSupported = isTrackPlayerSupported();
+  const detectionLog = getDetectionLog();
+  const loadError = getLoadError();
+  const selectedAudioEntry = sessionAudio?.find((sa: any) => sa.coach_id === selectedCoachId && sa.class_id === selectedClassId);
+  const selectedAudioUrl: string = selectedAudioEntry?.audio_url || '(none)';
+  const selectedAudioUrlShort = selectedAudioUrl.length > 80 ? `${selectedAudioUrl.slice(0, 80)}…` : selectedAudioUrl;
 
   React.useEffect(() => {
     const loadStreak = async () => {
@@ -64,6 +71,25 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ onClose }) => {
               Reset
             </Text>
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🎵 Audio / TrackPlayer</Text>
+          <Text style={styles.text}>
+            TP supported: {trackPlayerSupported ? 'Yes' : 'No (needs dev client or release build, not Expo Go)'}
+          </Text>
+          <Text style={styles.text}>Selected coach: {selectedCoachId || 'none'}</Text>
+          <Text style={styles.text}>Selected class: {selectedClassId || 'none'}</Text>
+          <Text style={styles.text}>Selected audio_url: {selectedAudioUrlShort}</Text>
+          {loadError ? (
+            <Text style={styles.text}>Load error: {loadError}</Text>
+          ) : null}
+          {detectionLog?.map((line: string, idx: number) => (
+            <Text key={idx} style={styles.text}>{line}</Text>
+          ))}
+          <Text style={styles.text}>
+            Quote if audio fails: requires dev client/build with react-native-track-player and real audio_url (non-example.com). In Expo Go it will be timer-only.
+          </Text>
         </View>
 
         <View style={styles.section}>

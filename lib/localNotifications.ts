@@ -19,15 +19,17 @@ async function ensureAndroidChannel() {
 }
 
 /** Ask only for notification permission (does NOT fetch Expo push token) */
-export async function ensureLocalNotifPermission(): Promise<boolean> {
+export async function ensureLocalNotifPermission(requestIfMissing = true): Promise<boolean> {
   const { status: existing } = await Notifications.getPermissionsAsync();
   let status = existing;
-  if (existing !== 'granted') {
+  
+  if (existing !== 'granted' && requestIfMissing) {
     const req = await Notifications.requestPermissionsAsync({
       ios: { allowAlert: true, allowBadge: true, allowSound: true },
     });
     status = req.status;
   }
+  
   const granted = status === 'granted';
   if (granted) await ensureAndroidChannel();
   return granted;
@@ -107,7 +109,8 @@ export async function scheduleNotificationById(id: string) {
 
 /** Schedule all enabled daily notifications */
 export async function scheduleAllDailyNotifications() {
-  const ok = await ensureLocalNotifPermission();
+  // Don't request permissions here, only schedule if already granted
+  const ok = await ensureLocalNotifPermission(false);
   if (!ok) {
     console.log('❌ Notification permission not granted - skipping daily notifications');
     return [];

@@ -18,7 +18,8 @@ import { useApp } from '../contexts/AppContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import LottieView from 'lottie-react-native';
-import { AudioPlayer, AudioSource, useAudioPlayer } from 'expo-audio';
+import { Audio } from 'expo-av';
+import { stopSleepSession } from '../lib/audio/player';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -245,8 +246,7 @@ export default function OnboardingCoach() {
 
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const [currentAudioUri, setCurrentAudioUri] = useState<string | null>(null);
-  const player = useAudioPlayer(currentAudioUri as AudioSource);
-  const stopTimeoutRef = useRef<number | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
   const lottieOpacity = useSharedValue(0);
   const playButtonOpacity = useSharedValue(1);
 
@@ -283,15 +283,14 @@ export default function OnboardingCoach() {
 
   const fadeOutAndStop = async () => {
     try {
-      if (stopTimeoutRef.current) {
-        clearTimeout(stopTimeoutRef.current);
-        stopTimeoutRef.current = null;
+      if (soundRef.current) {
+        await soundRef.current.setVolumeAsync(0);
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
       }
-      if (!player) return;
-      // expo-audio doesn't have volume control, so just stop
-      player.pause();
     } catch (e) {
-      // no-op
+      console.log('Error stopping audio:', e);
     } finally {
       setCurrentAudioUri(null);
       setPlayingIndex(null);
@@ -302,15 +301,8 @@ export default function OnboardingCoach() {
     // Fade out Lottie animation
     lottieOpacity.value = withTiming(0, { duration: 200 });
     
-    if (currentAudioUri) {
-      await fadeOutAndStop();
-    } else {
-      setPlayingIndex(null);
-      if (stopTimeoutRef.current) {
-        clearTimeout(stopTimeoutRef.current);
-        stopTimeoutRef.current = null;
-      }
-    }
+    await fadeOutAndStop();
+    setPlayingIndex(null);
     
     // Fade in play button after Lottie fades out
     setTimeout(() => {
@@ -320,10 +312,6 @@ export default function OnboardingCoach() {
 
   const handlePreviewVoice = async (index: number, coach: any) => {
     console.log('🎵 Play button pressed for coach:', coach.name, 'index:', index);
-    console.log('🎵 Coach data:', coach);
-    console.log('🎵 sample_audio value:', coach.sample_audio);
-    console.log('🎵 sample_audio type:', typeof coach.sample_audio);
-    console.log('🎵 All coach keys:', Object.keys(coach));
     
     try {
       // toggle off if tapping the same card
@@ -350,35 +338,113 @@ export default function OnboardingCoach() {
       lottieOpacity.value = withTiming(1, { duration: 200 });
       
       if (!uri) {
-        console.warn('❌ No audio URL found on coach. Available fields:', Object.keys(coach));
-        
-        // For testing, use a sample audio URL
-        console.log('🎵 Using test audio URL for debugging');
-        const testUri = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
-        
-        setCurrentAudioUri(testUri);
-        player.play();
-        console.log('✅ Test audio started playing');
-
-        // stop after 5 seconds with fadeout
-        stopTimeoutRef.current = setTimeout(() => {
-          fadeOutAndStop();
-        }, 5000);
+        console.warn('❌ No audio URL found on coach. Using test fallback.');
+        const testUri = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+        await playSound(testUri);
         return;
       }
 
+      // Try to clean the URI if needed or use it directly
       console.log('🎵 Loading audio from:', uri);
-      setCurrentAudioUri(uri);
-      player.play();
-      console.log('✅ Audio started playing');
+      await playSound(uri);
 
-      // stop after 5 seconds with fadeout
-      stopTimeoutRef.current = setTimeout(() => {
-        fadeOutAndStop();
-      }, 5000);
     } catch (e) {
       console.error('❌ Preview error:', e);
       await stopPlayback();
+    }
+  };
+
+  // Check if a URL is accessible
+  const checkUrlAccessible = async (url: string): Promise<boolean> => {
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const playSound = async (uri: string, isRetry = false) => {
+    try {
+      // Stop any active sleep session before playing sample
+      await stopSleepSession();
+      
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+      }
+      
+      // Ensure we are not in silent mode and audio is active
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+
+      console.log('🎵 Attempting to play:', uri);
+      
+      // Check if URL is accessible first
+      const isAccessible = await checkUrlAccessible(uri);
+      if (!isAccessible) {
+        console.warn('🎵 URL not accessible, will try fallback:', uri);
+        throw new Error('URL not accessible');
+      }
+      
+      const { sound, status } = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: true, volume: 1.0 }
+      );
+      
+      // Check if loaded successfully
+      if (!status.isLoaded) {
+        throw new Error('Sound failed to load');
+      }
+      
+      soundRef.current = sound;
+      setCurrentAudioUri(uri);
+      
+      console.log('🎵 Audio playing successfully!');
+      
+      // Listen for playback to finish naturally instead of timeout
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          fadeOutAndStop();
+          lottieOpacity.value = withTiming(0, { duration: 200 });
+          setTimeout(() => {
+            playButtonOpacity.value = withTiming(1, { duration: 200 });
+          }, 200);
+          setPlayingIndex(null);
+        }
+      });
+      
+    } catch (error) {
+      // Only log as warning if we have fallbacks to try (not a fatal error)
+      if (!isRetry) {
+        console.warn('🎵 Primary URL issue, trying fallbacks...');
+      }
+      
+      // List of fallback URLs to try (public domain / reliable CDNs)
+      const fallbackUrls = [
+        'https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73467.mp3',
+        'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg',
+        'https://upload.wikimedia.org/wikipedia/commons/c/c8/Example.ogg',
+      ];
+      
+      if (!isRetry) {
+        for (const fallbackUrl of fallbackUrls) {
+          try {
+            console.log('🎵 Trying fallback:', fallbackUrl);
+            await playSound(fallbackUrl, true);
+            return; // Success, exit without error
+          } catch {
+            continue; // Try next fallback
+          }
+        }
+        // All fallbacks failed - now show error
+        console.error('🎵 All audio sources failed');
+        stopPlayback();
+      } else {
+        throw error; // Re-throw for fallback loop
+      }
     }
   };
 
@@ -446,14 +512,19 @@ export default function OnboardingCoach() {
 
   // Set audio mode for iOS silent mode playback
   React.useEffect(() => {
-    // Audio mode configuration not needed with expo-audio
+    Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+    }).catch(err => console.warn('Failed to set audio mode:', err));
   }, []);
 
   // Cleanup on unmount
   React.useEffect(() => {
     return () => {
-      if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
-      stopPlayback();
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
     };
   }, []);
 

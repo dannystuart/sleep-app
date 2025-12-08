@@ -261,6 +261,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             locale: 'British',
             style: 'Smooth & Calm',
             image_url: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400',
+            sample_audio: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
             created_at: new Date().toISOString(),
             unlock_streak: 0 // Starter coach - always available
           },
@@ -270,6 +271,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             locale: 'American',
             style: 'Deep & Soothing',
             image_url: 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=400',
+            sample_audio: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
             created_at: new Date().toISOString(),
             unlock_streak: 3, // Unlocked at 3-day streak
             unlock_card: 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=600&h=800' // Test unlock card - different size
@@ -280,6 +282,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             locale: 'Australian',
             style: 'Gentle & Warm',
             image_url: 'https://images.pexels.com/photos/2379006/pexels-photo-2379006.jpeg?auto=compress&cs=tinysrgb&w=400',
+            sample_audio: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
             created_at: new Date().toISOString(),
             unlock_streak: 6, // Unlocked at 6-day streak
             unlock_card: 'https://images.pexels.com/photos/2379006/pexels-photo-2379006.jpeg?auto=compress&cs=tinysrgb&w=400' // Test unlock card
@@ -290,6 +293,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             locale: 'Canadian',
             style: 'Rich & Resonant',
             image_url: 'https://images.pexels.com/photos/2379007/pexels-photo-2379007.jpeg?auto=compress&cs=tinysrgb&w=400',
+            sample_audio: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
             created_at: new Date().toISOString(),
             unlock_streak: 8, // Unlocked at 8-day streak
             unlock_card: 'https://images.pexels.com/photos/2379007/pexels-photo-2379007.jpeg?auto=compress&cs=tinysrgb&w=400' // Test unlock card
@@ -300,6 +304,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             locale: 'Irish',
             style: 'Melodic & Peaceful',
             image_url: 'https://images.pexels.com/photos/2379008/pexels-photo-2379008.jpeg?auto=compress&cs=tinysrgb&w=400',
+            sample_audio: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
             created_at: new Date().toISOString(),
             unlock_streak: 10, // Unlocked at 10-day streak
             unlock_card: 'https://images.pexels.com/photos/2379008/pexels-photo-2379008.jpeg?auto=compress&cs=tinysrgb&w=400' // Test unlock card
