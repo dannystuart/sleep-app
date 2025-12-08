@@ -2,45 +2,24 @@
 import { 
   TrackPlayer, 
   isTrackPlayerSupported,
-  safeTrackPlayerCall 
 } from './trackPlayerSafe';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PLAYER_STATE_STORAGE_KEY } from './constants';
 
-// Get Capability, AppKilledPlaybackBehavior, and IOSCategory directly from the module
-let Capability: any = null;
-let AppKilledPlaybackBehavior: any = null;
-let IOSCategory: any = null;
-let IOSCategoryMode: any = null;
-let IOSCategoryOptions: any = null;
+// Minimal helpers to grab the module regardless of export shape
+const getTPModule = () => {
+  const m = require('react-native-track-player');
+  return (m as any).default ?? m;
+};
 
-try {
-  const rntp = require('react-native-track-player');
-  Capability = rntp.Capability;
-  AppKilledPlaybackBehavior = rntp.AppKilledPlaybackBehavior;
-  IOSCategory = rntp.IOSCategory;
-  IOSCategoryMode = rntp.IOSCategoryMode;
-  IOSCategoryOptions = rntp.IOSCategoryOptions;
-} catch {
-  // Will be null in Expo Go
-}
-
-// Helper: resolve the TrackPlayer object regardless of export shape
-function resolveTrackPlayer() {
-  const rntp = require('react-native-track-player');
-  const candidates = [
-    (rntp as any)?.TrackPlayer,
-    (rntp as any)?.default?.TrackPlayer,
-    rntp?.default,
-    rntp,
-  ];
-  for (const cand of candidates) {
-    if (cand && typeof cand.getState === 'function' && typeof cand.stop === 'function') {
-      return { tp: cand, State: rntp.State || cand.State };
-    }
+const getTPConst = <T = any>(key: string): T | null => {
+  try {
+    const m = require('react-native-track-player');
+    return (m as any)[key] ?? null;
+  } catch {
+    return null;
   }
-  throw new Error('TrackPlayer methods not found on any export');
-}
+};
 
 export async function setupPlayerOnce() {
   if (!isTrackPlayerSupported()) {
@@ -50,7 +29,8 @@ export async function setupPlayerOnce() {
 
   // Check if player is already initialized by trying to get state
   try {
-    const { tp } = resolveTrackPlayer();
+    const tp = getTPModule();
+    if (typeof tp?.getState !== 'function') throw new Error('getState missing');
     const state = await tp.getState();
     console.log('✅ TrackPlayer already initialized, state:', state);
     return; // Player is already set up
@@ -60,21 +40,33 @@ export async function setupPlayerOnce() {
   }
 
   try {
-    const { tp } = resolveTrackPlayer();
+    const tp = getTPModule();
+    if (typeof tp?.setupPlayer !== 'function') {
+      throw new Error('TrackPlayer.setupPlayer not found');
+    }
     
     console.log('🎵 Calling TrackPlayer.setupPlayer...');
     await tp.setupPlayer({
       waitForBuffer: true,
       // iOS audio session configuration - this makes it appear in Control Center
       // and properly interrupt other audio
-      ...(IOSCategory && {
-        iosCategory: IOSCategory.Playback,
-        iosCategoryMode: IOSCategoryMode?.SpokenAudio,
-      }),
+      ...(() => {
+        const IOSCategory = getTPConst('IOSCategory');
+        const IOSCategoryMode = getTPConst('IOSCategoryMode');
+        if (IOSCategory) {
+          return {
+            iosCategory: IOSCategory.Playback,
+            iosCategoryMode: IOSCategoryMode?.SpokenAudio,
+          };
+        }
+        return {};
+      })(),
     });
     console.log('✅ TrackPlayer.setupPlayer completed');
 
     // Only update options if we have the Capability constants
+    const Capability = getTPConst('Capability');
+    const AppKilledPlaybackBehavior = getTPConst('AppKilledPlaybackBehavior');
     if (Capability) {
       console.log('🎵 Updating TrackPlayer options...');
       await tp.updateOptions({
@@ -108,15 +100,26 @@ export async function stopSleepSession(): Promise<void> {
   }
   
   try {
-    const { tp, State } = resolveTrackPlayer();
+    const tp = getTPModule();
+    if (!tp) {
+      console.warn('TrackPlayer module not resolved in stopSleepSession');
+      return;
+    }
+    const State = getTPConst('State');
 
-    const state = await tp.getState();
+    const state = typeof tp.getState === 'function' ? await tp.getState() : null;
     console.log('🔍 Current TrackPlayer state:', state);
     
     if (state !== State?.None && state !== State?.Stopped) {
       console.log('🛑 Stopping sleep session before playing other audio');
-      await tp.stop();
-      await tp.reset();
+      if (typeof tp.stop === 'function') {
+        await tp.stop();
+      } else if (typeof tp.pause === 'function') {
+        await tp.pause();
+      }
+      if (typeof tp.reset === 'function') {
+        await tp.reset();
+      }
       await AsyncStorage.removeItem('theta_sleep_end_ts');
       await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
       console.log('✅ Sleep session stopped successfully');
@@ -137,9 +140,11 @@ export async function isSleepSessionActive(): Promise<boolean> {
   }
   
   try {
-    const { tp, State } = resolveTrackPlayer();
+    const tp = getTPModule();
+    if (!tp) return false;
+    const State = getTPConst('State');
     
-    const state = await tp.getState();
+    const state = typeof tp.getState === 'function' ? await tp.getState() : null;
     return state !== State?.None && state !== State?.Stopped;
   } catch {
     return false;

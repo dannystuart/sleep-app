@@ -28,7 +28,7 @@ const resolveTrackPlayerDirect = () => {
       rntp,
     ];
     for (const cand of candidates) {
-      if (cand && typeof cand.getState === 'function' && typeof cand.stop === 'function') {
+      if (cand && typeof cand.getState === 'function') {
         return { tp: cand, State: rntp.State || cand.State };
       }
     }
