@@ -5,6 +5,7 @@ import { Play, Pause, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PLAYER_STATE_STORAGE_KEY } from '../lib/audio/constants';
+import { stopSleepSession } from '../lib/audio/player';
 
 // Try to import TrackPlayer directly
 let TrackPlayer: any = null;
@@ -129,14 +130,9 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
   };
 
   const stopSession = async () => {
-    if (!TrackPlayer) return;
-    
     try {
-      await TrackPlayer.stop();
-      await TrackPlayer.reset();
-      await AsyncStorage.removeItem('theta_sleep_end_ts');
-      await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
-      
+      await stopSleepSession();
+      setIsPlaying(false);
       Animated.timing(slideAnim, {
         toValue: 100,
         duration: 200,
@@ -148,7 +144,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
   };
 
   const openSession = () => {
-    router.push('/sleep-session');
+    // Resume existing session; do not restart it
+    router.push('/sleep-session?resume=1');
   };
 
   if (!isVisible) return null;

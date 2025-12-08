@@ -62,7 +62,7 @@ try {
 import { TrackPlayer as TrackPlayerSafe, getEventConstant, getStateConstant, isTrackPlayerSupported, getDetectionLog } from '../../lib/audio/trackPlayerSafe';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from '../../components/SafeAreaView';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { useApp } from '../../contexts/AppContext';
@@ -70,9 +70,11 @@ import { ChevronDown, Play, Pause, SkipBack, Clock, PauseCircle, ArrowDown } fro
 import { LinearGradient } from 'expo-linear-gradient';
 import { track } from '../../lib/analytics';
 import { ACTIVE_SESSION_STORAGE_KEY, PLAYER_STATE_STORAGE_KEY } from '../../lib/audio/constants';
+import { isSleepSessionActive } from '../../lib/audio/player';
 
 export default function SleepSessionScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const { coaches, classes, sessionAudio, selectedCoachId, selectedClassId, timerSeconds, logEvent, isLoading, streak } = useApp();
   const coach = coaches.find(c => c.id === selectedCoachId);
   const cls = classes.find(c => c.id === selectedClassId);
@@ -153,12 +155,27 @@ export default function SleepSessionScreen() {
 
   // 2) defer session setup until after nav animation
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => startSession());
+    const task = InteractionManager.runAfterInteractions(async () => {
+      // If resumed from mini player, do not restart session if already active
+      const resume = params?.resume === '1';
+      if (resume) {
+        try {
+          const active = await isSleepSessionActive();
+          if (active) {
+            setIsPlaying(true);
+            return;
+          }
+        } catch {
+          // fall through to start session
+        }
+      }
+      startSession();
+    });
     return () => {
       task.cancel?.();
       cleanupSession();
     };
-  }, [selectedCoachId, selectedClassId, timerSeconds]); // Restart session when parameters change
+  }, [selectedCoachId, selectedClassId, timerSeconds, params?.resume]); // Restart session when parameters change
 
   // AppState guard - if app wakes after timer elapsed, end immediately
   useEffect(() => {
