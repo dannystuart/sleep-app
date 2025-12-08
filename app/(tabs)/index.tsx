@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Asset } from 'expo-asset';
@@ -13,6 +13,7 @@ import { DebugPanel } from '../../components/DebugPanel';
 import { StreakSheet } from '../../components/StreakSheet';
 import { AnnouncementSheet } from '../../components/AnnouncementSheet';
 import { track } from '../../lib/analytics';
+import { isSleepSessionActive } from '../../lib/audio/player';
 
 const { width } = Dimensions.get('window');
 const maxWidth = Math.min(width, 400);
@@ -24,6 +25,8 @@ export default function HomeScreen() {
   const [showStreakSheet, setShowStreakSheet] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [miniActive, setMiniActive] = useState(false);
+  const startOpacity = React.useRef(new Animated.Value(1)).current;
 
   // pull announcements from context
   const app = useApp();
@@ -132,6 +135,38 @@ export default function HomeScreen() {
   useEffect(() => {
     Asset.loadAsync(require('../../assets/images/THETA-BG.png'));
   }, []);
+
+  // Monitor active sleep session to fade start section when mini player visible
+  useEffect(() => {
+    let mounted = true;
+    const animate = (active: boolean) => {
+      Animated.timing(startOpacity, {
+        toValue: active ? 0 : 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    };
+    const check = async () => {
+      try {
+        const active = await isSleepSessionActive();
+        if (!mounted) return;
+        setMiniActive(prev => {
+          if (prev !== active) {
+            animate(active);
+          }
+          return active;
+        });
+      } catch {
+        // ignore
+      }
+    };
+    check();
+    const interval = setInterval(check, 1000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [startOpacity]);
 
   // streak variants
   const streakCount = streakUI?.current ?? 0;
@@ -352,10 +387,13 @@ export default function HomeScreen() {
                 </View>
 
                 {/* Start Session */}
-                <View style={styles.startSession}>
+                <Animated.View
+                  style={[styles.startSession, { opacity: startOpacity }]}
+                  pointerEvents={miniActive ? 'none' : 'auto'}
+                >
                   <Text style={styles.startSessionText}>Start Session</Text>
                   <PlayButton onPress={handlePlayButtonPress} />
-                </View>
+                </Animated.View>
               </View>
             </View>
           </View>
