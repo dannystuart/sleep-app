@@ -19,12 +19,18 @@ let directLoadError: string | null = null;
 
 try {
   const rntp = require('react-native-track-player');
-  // The default export is the TrackPlayer object
-  TrackPlayerDirect = rntp.default || rntp;
+  // The TrackPlayer methods are on the default export
+  if (rntp.default && typeof rntp.default.setupPlayer === 'function') {
+    TrackPlayerDirect = rntp.default;
+  } else if (typeof rntp.setupPlayer === 'function') {
+    TrackPlayerDirect = rntp;
+  } else {
+    throw new Error('TrackPlayer methods not found');
+  }
   // Event and State are named exports, not properties of default
   TrackPlayerEventDirect = rntp.Event;
   TrackPlayerStateDirect = rntp.State;
-  console.log('✅ Direct TrackPlayer import successful, Event:', !!TrackPlayerEventDirect, 'State:', !!TrackPlayerStateDirect);
+  console.log('✅ Direct TrackPlayer import successful, Event:', !!TrackPlayerEventDirect, 'State:', !!TrackPlayerStateDirect, 'Methods:', !!TrackPlayerDirect.play);
 } catch (e: any) {
   directLoadError = e?.message || 'Unknown error';
   console.log('ℹ️ Direct TrackPlayer import failed:', directLoadError);

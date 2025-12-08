@@ -54,6 +54,8 @@ export default function ChooseCoachScreen() {
       playsInSilentModeIOS: true,
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
+      interruptionModeIOS: 1, // DoNotMix - interrupts other audio
+      interruptionModeAndroid: 1, // DoNotMix
     }).catch(err => console.warn('Failed to set audio mode:', err));
   }, []);
 
@@ -101,11 +103,13 @@ export default function ChooseCoachScreen() {
       // Set playing state immediately
       setPlayingCoachId(coachId);
       
-      // Ensure audio mode is set
+      // Ensure audio mode is set to interrupt other audio
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
         shouldDuckAndroid: true,
+        interruptionModeIOS: 1, // DoNotMix - interrupts other audio
+        interruptionModeAndroid: 1, // DoNotMix
       });
 
       console.log('🎵 Attempting to play:', uri);

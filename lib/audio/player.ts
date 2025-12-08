@@ -35,7 +35,7 @@ export async function setupPlayerOnce() {
   try {
     // Get TrackPlayer directly to avoid the safe wrapper eating the error
     const rntp = require('react-native-track-player');
-    const tp = rntp.default || rntp;
+    const tp = rntp.default && typeof rntp.default.getState === 'function' ? rntp.default : rntp;
     const state = await tp.getState();
     console.log('✅ TrackPlayer already initialized, state:', state);
     return; // Player is already set up
@@ -47,19 +47,17 @@ export async function setupPlayerOnce() {
   try {
     // Use direct import to avoid proxy issues
     const rntp = require('react-native-track-player');
-    const tp = rntp.default || rntp;
+    const tp = rntp.default && typeof rntp.default.setupPlayer === 'function' ? rntp.default : rntp;
     
     console.log('🎵 Calling TrackPlayer.setupPlayer...');
     await tp.setupPlayer({
       waitForBuffer: true,
       // iOS audio session configuration - this makes it appear in Control Center
       // and properly interrupt other audio
-      iosCategory: IOSCategory?.Playback,
-      iosCategoryMode: IOSCategoryMode?.SpokenAudio,
-      iosCategoryOptions: IOSCategoryOptions ? [
-        IOSCategoryOptions.DuckOthers,
-        IOSCategoryOptions.InterruptSpokenAudioAndMixWithOthers,
-      ] : undefined,
+      ...(IOSCategory && {
+        iosCategory: IOSCategory.Playback,
+        iosCategoryMode: IOSCategoryMode?.SpokenAudio,
+      }),
     });
     console.log('✅ TrackPlayer.setupPlayer completed');
 
@@ -98,7 +96,7 @@ export async function stopSleepSession(): Promise<void> {
   
   try {
     const rntp = require('react-native-track-player');
-    const tp = rntp.default || rntp;
+    const tp = rntp.default && typeof rntp.default.getState === 'function' ? rntp.default : rntp;
     const State = rntp.State;
     
     const state = await tp.getState();
@@ -108,6 +106,7 @@ export async function stopSleepSession(): Promise<void> {
       await tp.reset();
       await AsyncStorage.removeItem('theta_sleep_end_ts');
       await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
+      console.log('✅ Sleep session stopped successfully');
     }
   } catch (error) {
     console.warn('Failed to stop sleep session:', error);
@@ -124,7 +123,7 @@ export async function isSleepSessionActive(): Promise<boolean> {
   
   try {
     const rntp = require('react-native-track-player');
-    const tp = rntp.default || rntp;
+    const tp = rntp.default && typeof rntp.default.getState === 'function' ? rntp.default : rntp;
     const State = rntp.State;
     
     const state = await tp.getState();

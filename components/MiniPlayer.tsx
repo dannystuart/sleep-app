@@ -12,7 +12,8 @@ let TrackPlayerState: any = null;
 
 try {
   const rntp = require('react-native-track-player');
-  TrackPlayer = rntp.default || rntp;
+  // Check if methods exist on default or root
+  TrackPlayer = rntp.default && typeof rntp.default.getState === 'function' ? rntp.default : rntp;
   TrackPlayerState = rntp.State;
 } catch {
   // TrackPlayer not available

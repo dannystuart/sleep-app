@@ -374,10 +374,13 @@ export default function OnboardingCoach() {
       }
       
       // Ensure we are not in silent mode and audio is active
+      // Use DoNotMix to interrupt other audio (like TrackPlayer)
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
         shouldDuckAndroid: true,
+        interruptionModeIOS: 1, // DoNotMix - interrupts other audio
+        interruptionModeAndroid: 1, // DoNotMix
       });
 
       console.log('🎵 Attempting to play:', uri);
