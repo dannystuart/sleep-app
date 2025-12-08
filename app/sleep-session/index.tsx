@@ -17,6 +17,27 @@ let TrackPlayerEventDirect: any = null;
 let TrackPlayerStateDirect: any = null;
 let directLoadError: string | null = null;
 
+// Helper to resolve TrackPlayer regardless of export shape
+const resolveTrackPlayerDirect = () => {
+  try {
+    const rntp = require('react-native-track-player');
+    const candidates = [
+      (rntp as any)?.TrackPlayer,
+      (rntp as any)?.default?.TrackPlayer,
+      rntp?.default,
+      rntp,
+    ];
+    for (const cand of candidates) {
+      if (cand && typeof cand.getState === 'function' && typeof cand.stop === 'function') {
+        return { tp: cand, State: rntp.State || cand.State };
+      }
+    }
+  } catch (e) {
+    console.log('resolveTrackPlayerDirect error:', e);
+  }
+  return { tp: null, State: null };
+};
+
 try {
   const rntp = require('react-native-track-player');
   // Try different ways to access TrackPlayer
@@ -143,9 +164,11 @@ export default function SleepSessionScreen() {
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (state) => {
       if (state === 'active') {
-        if (hasAudio && isTrackPlayerReady && TrackPlayerDirect) {
+        if (hasAudio && isTrackPlayerReady) {
           try {
-            const trackPlayerState = await TrackPlayerDirect.getState();
+            const { tp } = resolveTrackPlayerDirect();
+            if (!tp) return;
+            const trackPlayerState = await tp.getState();
             const isCurrentlyPlaying = trackPlayerState === TrackPlayerState.Playing;
             console.log('📱 App became active, syncing state:', isCurrentlyPlaying);
             if (isCurrentlyPlaying !== isPlaying) {
@@ -162,19 +185,21 @@ export default function SleepSessionScreen() {
         }
 
         if (sessionEndTime.current && Date.now() >= sessionEndTime.current) {
-          if (TrackPlayerDirect) {
-            try {
-              await TrackPlayerDirect.stop();
-            } catch {}
-          }
+          try {
+            const { tp } = resolveTrackPlayerDirect();
+            if (tp) {
+              await tp.stop();
+            }
+          } catch {}
           finishSession();
         }
       }
     });
 
     let playbackSub: any = null;
-    if (isTrackPlayerReady && TrackPlayerDirect) {
-      playbackSub = TrackPlayerDirect.addEventListener(
+    if (isTrackPlayerReady) {
+      const { tp } = resolveTrackPlayerDirect();
+      playbackSub = tp?.addEventListener?.(
         TrackPlayerEvent.PlaybackState,
         async ({ state }: { state: any }) => {
         console.log('🎵 Playback state updated (component listener):', state);
@@ -353,9 +378,12 @@ export default function SleepSessionScreen() {
       }).catch(() => {});
 
       // Stop TrackPlayer and clear stored timer
-      if (isTrackPlayerReady && TrackPlayerDirect) {
+      if (isTrackPlayerReady) {
         try {
-          await TrackPlayerDirect.stop();
+          const { tp } = resolveTrackPlayerDirect();
+          if (tp) {
+            await tp.stop();
+          }
         } catch (error) {
           console.warn('Failed to stop TrackPlayer:', error);
         }
@@ -387,11 +415,16 @@ export default function SleepSessionScreen() {
     }
     
     // Stop TrackPlayer if it's running
-    if (isTrackPlayerReady && TrackPlayerDirect) {
+    if (isTrackPlayerReady) {
       try {
-        await TrackPlayerDirect.stop();
-        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
-        console.log('🛑 TrackPlayer stopped during cleanup');
+        const { tp } = resolveTrackPlayerDirect();
+        if (tp) {
+          await tp.stop();
+          await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
+          console.log('🛑 TrackPlayer stopped during cleanup');
+        } else {
+          console.warn('TrackPlayer not resolved during cleanup');
+        }
       } catch (error) {
         console.warn('Failed to stop TrackPlayer during cleanup:', error);
       }
@@ -442,17 +475,22 @@ export default function SleepSessionScreen() {
       return;
     }
     
-    if (isTrackPlayerReady && TrackPlayerDirect) {
+    if (isTrackPlayerReady) {
       try {
-        const state = await TrackPlayerDirect.getState();
+        const { tp } = resolveTrackPlayerDirect();
+        if (!tp) {
+          console.warn('TrackPlayer not resolved for togglePlay');
+          return;
+        }
+        const state = await tp.getState();
         console.log('🎵 TrackPlayer state:', state);
         if (state === TrackPlayerState.Playing) {
-          await TrackPlayerDirect.pause();
+          await tp.pause();
           setIsPlaying(false);
           pauseTimer();
           console.log('⏸️ TrackPlayer paused');
         } else {
-          await TrackPlayerDirect.play();
+          await tp.play();
           setIsPlaying(true);
           resumeTimer();
           console.log('▶️ TrackPlayer playing');

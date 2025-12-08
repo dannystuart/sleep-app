@@ -28,7 +28,12 @@ try {
 // Helper: resolve the TrackPlayer object regardless of export shape
 function resolveTrackPlayer() {
   const rntp = require('react-native-track-player');
-  const candidates = [rntp, rntp?.default, (rntp as any)?.TrackPlayer];
+  const candidates = [
+    (rntp as any)?.TrackPlayer,
+    (rntp as any)?.default?.TrackPlayer,
+    rntp?.default,
+    rntp,
+  ];
   for (const cand of candidates) {
     if (cand && typeof cand.getState === 'function' && typeof cand.stop === 'function') {
       return { tp: cand, State: rntp.State || cand.State };
