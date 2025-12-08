@@ -35,7 +35,14 @@ export async function setupPlayerOnce() {
   try {
     // Get TrackPlayer directly to avoid the safe wrapper eating the error
     const rntp = require('react-native-track-player');
-    const tp = rntp.default && typeof rntp.default.getState === 'function' ? rntp.default : rntp;
+    let tp: any = null;
+    if (typeof rntp.getState === 'function') {
+      tp = rntp;
+    } else if (rntp.default && typeof rntp.default.getState === 'function') {
+      tp = rntp.default;
+    } else {
+      throw new Error('TrackPlayer methods not found');
+    }
     const state = await tp.getState();
     console.log('✅ TrackPlayer already initialized, state:', state);
     return; // Player is already set up
@@ -47,7 +54,14 @@ export async function setupPlayerOnce() {
   try {
     // Use direct import to avoid proxy issues
     const rntp = require('react-native-track-player');
-    const tp = rntp.default && typeof rntp.default.setupPlayer === 'function' ? rntp.default : rntp;
+    let tp: any = null;
+    if (typeof rntp.setupPlayer === 'function') {
+      tp = rntp;
+    } else if (rntp.default && typeof rntp.default.setupPlayer === 'function') {
+      tp = rntp.default;
+    } else {
+      throw new Error('TrackPlayer setupPlayer not found');
+    }
     
     console.log('🎵 Calling TrackPlayer.setupPlayer...');
     await tp.setupPlayer({
@@ -96,10 +110,25 @@ export async function stopSleepSession(): Promise<void> {
   
   try {
     const rntp = require('react-native-track-player');
-    const tp = rntp.default && typeof rntp.default.getState === 'function' ? rntp.default : rntp;
+    
+    // Try different ways to access TrackPlayer
+    let tp: any = null;
+    if (typeof rntp.getState === 'function') {
+      tp = rntp;
+      console.log('🔍 Using TrackPlayer from root export');
+    } else if (rntp.default && typeof rntp.default.getState === 'function') {
+      tp = rntp.default;
+      console.log('🔍 Using TrackPlayer from default export');
+    } else {
+      console.warn('⚠️ TrackPlayer methods not found on any export');
+      return;
+    }
+    
     const State = rntp.State;
     
     const state = await tp.getState();
+    console.log('🔍 Current TrackPlayer state:', state);
+    
     if (state !== State?.None && state !== State?.Stopped) {
       console.log('🛑 Stopping sleep session before playing other audio');
       await tp.stop();
@@ -107,6 +136,8 @@ export async function stopSleepSession(): Promise<void> {
       await AsyncStorage.removeItem('theta_sleep_end_ts');
       await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
       console.log('✅ Sleep session stopped successfully');
+    } else {
+      console.log('ℹ️ No active session to stop');
     }
   } catch (error) {
     console.warn('Failed to stop sleep session:', error);
@@ -123,7 +154,14 @@ export async function isSleepSessionActive(): Promise<boolean> {
   
   try {
     const rntp = require('react-native-track-player');
-    const tp = rntp.default && typeof rntp.default.getState === 'function' ? rntp.default : rntp;
+    let tp: any = null;
+    if (typeof rntp.getState === 'function') {
+      tp = rntp;
+    } else if (rntp.default && typeof rntp.default.getState === 'function') {
+      tp = rntp.default;
+    } else {
+      return false;
+    }
     const State = rntp.State;
     
     const state = await tp.getState();
