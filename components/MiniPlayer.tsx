@@ -103,13 +103,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
   const handleStopSession = async () => {
     try {
       // Immediately hide
-      setIsVisible(false);
       Animated.timing(slideAnim, {
         toValue: 100,
-        duration: 200,
+        duration: 300, // softer fade/slide
         useNativeDriver: true,
-      }).start();
-      
+      }).start(() => {
+        setIsVisible(false);
+      });
+
       // Stop the session (this also sets the stopped flag)
       await stopSleepSession();
       setIsPlaying(false);
