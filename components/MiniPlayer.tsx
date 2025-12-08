@@ -7,6 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PLAYER_STATE_STORAGE_KEY } from '../lib/audio/constants';
 import { stopSleepSession, isSleepSessionActive } from '../lib/audio/player';
 
+const SUPPRESS_KEY = 'theta_mini_suppress_until';
+
 // Try to import TrackPlayer directly
 let TrackPlayer: any = null;
 let TrackPlayerState: any = null;
@@ -35,6 +37,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
   const [isVisible, setIsVisible] = useState(false);
   const [manualHide, setManualHide] = useState(false);
   const manualHideUntilRef = useRef(0);
+  const suppressUntilRef = useRef(0);
   const slideAnim = useState(new Animated.Value(100))[0];
 
   // Check if there's an active session
@@ -42,12 +45,23 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
     const checkActiveSession = async () => {
       try {
         // Hard guard: if we recently hid manually, keep hidden
-        if (manualHideUntilRef.current > Date.now()) {
+        if (manualHideUntilRef.current > Date.now() || suppressUntilRef.current > Date.now()) {
           setIsVisible(false);
           return;
         } else if (manualHide) {
           setManualHide(false);
         }
+
+        // Check persisted suppression
+        try {
+          const stored = await AsyncStorage.getItem(SUPPRESS_KEY);
+          const storedNum = stored ? Number(stored) : 0;
+          suppressUntilRef.current = storedNum || 0;
+          if (storedNum > Date.now()) {
+            setIsVisible(false);
+            return;
+          }
+        } catch {}
 
         const active = await isSleepSessionActive();
         if (!active) {
@@ -151,7 +165,10 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
   const stopSession = async () => {
     try {
       setManualHide(true); // prevent pop-back while stopping
-      manualHideUntilRef.current = Date.now() + 6000; // keep hidden for a short window
+      const until = Date.now() + 15000; // keep hidden for a short window
+      manualHideUntilRef.current = until;
+      suppressUntilRef.current = until;
+      await AsyncStorage.setItem(SUPPRESS_KEY, String(until));
       await stopSleepSession();
       setIsPlaying(false);
       Animated.timing(slideAnim, {
