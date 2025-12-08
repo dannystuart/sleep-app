@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Play, Pause, X } from 'lucide-react-native';
@@ -7,15 +7,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PLAYER_STATE_STORAGE_KEY } from '../lib/audio/constants';
 import { stopSleepSession, isSleepSessionActive } from '../lib/audio/player';
 
-const SUPPRESS_KEY = 'theta_mini_suppress_until';
-
 // Try to import TrackPlayer directly
 let TrackPlayer: any = null;
 let TrackPlayerState: any = null;
 
 try {
   const rntp = require('react-native-track-player');
-  // Try different ways to access TrackPlayer
   if (typeof rntp.getState === 'function') {
     TrackPlayer = rntp;
   } else if (rntp.default && typeof rntp.default.getState === 'function') {
@@ -35,44 +32,17 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
   const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [manualHide, setManualHide] = useState(false);
-  const manualHideUntilRef = useRef(0);
-  const suppressUntilRef = useRef(0);
   const slideAnim = useState(new Animated.Value(100))[0];
 
   // Check if there's an active session
   useEffect(() => {
     const checkActiveSession = async () => {
       try {
-        // Hard guard: if we recently hid manually, keep hidden
-        if (manualHideUntilRef.current > Date.now() || suppressUntilRef.current > Date.now()) {
-          setIsVisible(false);
-          return;
-        } else if (manualHide) {
-          setManualHide(false);
-        }
-
-        // Check persisted suppression
-        try {
-          const stored = await AsyncStorage.getItem(SUPPRESS_KEY);
-          const storedNum = stored ? Number(stored) : 0;
-          suppressUntilRef.current = storedNum || 0;
-          if (storedNum > Date.now()) {
-            setIsVisible(false);
-            return;
-          }
-        } catch {}
-
         const active = await isSleepSessionActive();
-        if (!active) {
-          setManualHide(false);
-        }
 
-        const shouldShow = active && !manualHide;
-
-        if (shouldShow) {
+        if (active) {
           setIsVisible(true);
-          // If TrackPlayer is available, sync play state; otherwise default to playing
+          // Sync play state from TrackPlayer
           if (TrackPlayer) {
             try {
               const state = await TrackPlayer.getState();
@@ -97,7 +67,6 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
           }).start(() => setIsVisible(false));
         }
       } catch (error) {
-        // Player not initialized
         setIsVisible(false);
       }
     };
@@ -107,39 +76,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
     // Poll for state changes
     const interval = setInterval(checkActiveSession, 1000);
     
-    // Also listen to playback state events if available
-    let subscription: any = null;
-    if (TrackPlayer && TrackPlayerState) {
-      try {
-        const rntp = require('react-native-track-player');
-        subscription = TrackPlayer.addEventListener(
-          rntp.Event.PlaybackState,
-          ({ state }: { state: any }) => {
-            const hasActiveTrack = state !== TrackPlayerState?.None && state !== TrackPlayerState?.Stopped;
-            if (hasActiveTrack) {
-              setIsVisible(true);
-              setIsPlaying(state === TrackPlayerState?.Playing);
-              Animated.spring(slideAnim, {
-                toValue: 0,
-                useNativeDriver: true,
-                tension: 100,
-                friction: 10,
-              }).start();
-            } else {
-              Animated.timing(slideAnim, {
-                toValue: 100,
-                duration: 200,
-                useNativeDriver: true,
-              }).start(() => setIsVisible(false));
-            }
-          }
-        );
-      } catch {}
-    }
-    
     return () => {
       clearInterval(interval);
-      subscription?.remove();
     };
   }, []);
 
@@ -162,20 +100,19 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
     }
   };
 
-  const stopSession = async () => {
+  const handleStopSession = async () => {
     try {
-      setManualHide(true); // prevent pop-back while stopping
-      const until = Date.now() + 15000; // keep hidden for a short window
-      manualHideUntilRef.current = until;
-      suppressUntilRef.current = until;
-      await AsyncStorage.setItem(SUPPRESS_KEY, String(until));
-      await stopSleepSession();
-      setIsPlaying(false);
+      // Immediately hide
+      setIsVisible(false);
       Animated.timing(slideAnim, {
         toValue: 100,
         duration: 200,
         useNativeDriver: true,
-      }).start(() => setIsVisible(false));
+      }).start();
+      
+      // Stop the session (this also sets the stopped flag)
+      await stopSleepSession();
+      setIsPlaying(false);
     } catch (error) {
       console.warn('Failed to stop session:', error);
     }
@@ -221,7 +158,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
             )}
           </TouchableOpacity>
           
-          <TouchableOpacity onPress={stopSession} style={styles.stopButton}>
+          <TouchableOpacity onPress={handleStopSession} style={styles.stopButton}>
             <X size={20} color="white" />
           </TouchableOpacity>
         </View>
@@ -292,4 +229,3 @@ const styles = StyleSheet.create({
 });
 
 export default MiniPlayer;
-

@@ -70,7 +70,7 @@ import { ChevronDown, Play, Pause, SkipBack, Clock, PauseCircle, ArrowDown } fro
 import { LinearGradient } from 'expo-linear-gradient';
 import { track } from '../../lib/analytics';
 import { ACTIVE_SESSION_STORAGE_KEY, PLAYER_STATE_STORAGE_KEY } from '../../lib/audio/constants';
-import { isSleepSessionActive } from '../../lib/audio/player';
+import { isSleepSessionActive, clearSessionStoppedFlag } from '../../lib/audio/player';
 
 export default function SleepSessionScreen() {
   const router = useRouter();
@@ -247,6 +247,9 @@ export default function SleepSessionScreen() {
   const startSession = async () => {
     try {
       console.log('🚀 Starting session with timer:', timerSeconds, 'minutes');
+      
+      // Clear the "session stopped" flag so mini player can show again
+      await clearSessionStoppedFlag();
       
       // 1. Analytics
       await logEvent({ 

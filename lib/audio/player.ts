@@ -90,6 +90,9 @@ export async function setupPlayerOnce() {
   }
 }
 
+// Key to mark session as explicitly stopped by user
+const SESSION_STOPPED_KEY = 'theta_session_stopped';
+
 /**
  * Stop the current sleep session if one is playing.
  * Call this before playing other audio (like coach samples).
@@ -105,34 +108,57 @@ export async function stopSleepSession(): Promise<void> {
       console.warn('TrackPlayer module not resolved in stopSleepSession');
       return;
     }
-    const State = getTPConst('State');
 
-    const state = typeof tp.getState === 'function' ? await tp.getState() : null;
-    console.log('🔍 Current TrackPlayer state:', state);
+    console.log('🛑 Force stopping sleep session');
     
-    if (state !== State?.None && state !== State?.Stopped) {
-      console.log('🛑 Stopping sleep session before playing other audio');
-      if (typeof tp.stop === 'function') {
-        await tp.stop();
-      } else if (typeof tp.pause === 'function') {
+    // Stop/pause and reset regardless of current state
+    try {
+      if (typeof tp.pause === 'function') {
         await tp.pause();
       }
+    } catch {}
+    
+    try {
+      if (typeof tp.stop === 'function') {
+        await tp.stop();
+      }
+    } catch {}
+    
+    try {
       if (typeof tp.reset === 'function') {
         await tp.reset();
       }
-      await AsyncStorage.removeItem('theta_sleep_end_ts');
-      await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
-      console.log('✅ Sleep session stopped successfully');
-    } else {
-      console.log('ℹ️ No active session to stop');
-    }
+    } catch {}
+    
+    // Mark session as explicitly stopped
+    await AsyncStorage.setItem(SESSION_STOPPED_KEY, 'true');
+    await AsyncStorage.removeItem('theta_sleep_end_ts');
+    await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
+    
+    console.log('✅ Sleep session stopped and marked as stopped');
   } catch (error) {
     console.warn('Failed to stop sleep session:', error);
   }
 }
 
 /**
+ * Clear the stopped flag when starting a new session
+ */
+export async function clearSessionStoppedFlag(): Promise<void> {
+  await AsyncStorage.removeItem(SESSION_STOPPED_KEY);
+}
+
+/**
+ * Check if session was explicitly stopped by user
+ */
+export async function wasSessionExplicitlyStopped(): Promise<boolean> {
+  const stopped = await AsyncStorage.getItem(SESSION_STOPPED_KEY);
+  return stopped === 'true';
+}
+
+/**
  * Check if a sleep session is currently active/playing.
+ * Returns false if user explicitly stopped the session.
  */
 export async function isSleepSessionActive(): Promise<boolean> {
   if (!isTrackPlayerSupported()) {
@@ -140,6 +166,12 @@ export async function isSleepSessionActive(): Promise<boolean> {
   }
   
   try {
+    // If user explicitly stopped, always return false
+    const explicitlyStopped = await wasSessionExplicitlyStopped();
+    if (explicitlyStopped) {
+      return false;
+    }
+    
     const tp = getTPModule();
     if (!tp) return false;
     const State = getTPConst('State');
