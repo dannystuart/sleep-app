@@ -33,6 +33,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const slideAnim = useState(new Animated.Value(100))[0];
+  const opacityAnim = useState(new Animated.Value(1))[0];
 
   // Check if there's an active session
   useEffect(() => {
@@ -42,6 +43,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
 
         if (active) {
           setIsVisible(true);
+          opacityAnim.setValue(1); // Reset opacity when showing
           // Sync play state from TrackPlayer
           if (TrackPlayer) {
             try {
@@ -102,13 +104,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
 
   const handleStopSession = async () => {
     try {
-      // Immediately hide
-      Animated.timing(slideAnim, {
-        toValue: 100,
-        duration: 300, // softer fade/slide
+      // Fade out in place (no position change)
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 300,
         useNativeDriver: true,
       }).start(() => {
         setIsVisible(false);
+        opacityAnim.setValue(1); // Reset for next time
       });
 
       // Stop the session (this also sets the stopped flag)
@@ -130,7 +133,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
     <Animated.View 
       style={[
         styles.container,
-        { transform: [{ translateY: slideAnim }] }
+        { transform: [{ translateY: slideAnim }], opacity: opacityAnim }
       ]}
     >
       <LinearGradient
