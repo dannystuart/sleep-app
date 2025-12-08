@@ -5,7 +5,7 @@ import { Play, Pause, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PLAYER_STATE_STORAGE_KEY } from '../lib/audio/constants';
-import { stopSleepSession } from '../lib/audio/player';
+import { stopSleepSession, isSleepSessionActive } from '../lib/audio/player';
 
 // Try to import TrackPlayer directly
 let TrackPlayer: any = null;
@@ -33,23 +33,33 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
   const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [manualHide, setManualHide] = useState(false);
   const slideAnim = useState(new Animated.Value(100))[0];
 
   // Check if there's an active session
   useEffect(() => {
     const checkActiveSession = async () => {
       try {
-        if (!TrackPlayer) {
-          setIsVisible(false);
-          return;
+        const active = await isSleepSessionActive();
+        if (!active) {
+          setManualHide(false);
         }
 
-        const state = await TrackPlayer.getState();
-        const hasActiveTrack = state !== TrackPlayerState?.None && state !== TrackPlayerState?.Stopped;
-        
-        if (hasActiveTrack) {
+        const shouldShow = active && !manualHide;
+
+        if (shouldShow) {
           setIsVisible(true);
-          setIsPlaying(state === TrackPlayerState?.Playing);
+          // If TrackPlayer is available, sync play state; otherwise default to playing
+          if (TrackPlayer) {
+            try {
+              const state = await TrackPlayer.getState();
+              setIsPlaying(state === TrackPlayerState?.Playing);
+            } catch {
+              setIsPlaying(true);
+            }
+          } else {
+            setIsPlaying(true);
+          }
           Animated.spring(slideAnim, {
             toValue: 0,
             useNativeDriver: true,
@@ -131,6 +141,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
 
   const stopSession = async () => {
     try {
+      setManualHide(true); // prevent pop-back while stopping
       await stopSleepSession();
       setIsPlaying(false);
       Animated.timing(slideAnim, {
