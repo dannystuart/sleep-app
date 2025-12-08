@@ -170,7 +170,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 100, // Raised above the tab bar
+    bottom: 120, // Raised above the tab bar
     left: 12,
     right: 12,
     borderRadius: 16,
