@@ -1,6 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import TrackPlayer, { Event, State } from 'react-native-track-player';
+import { TrackPlayer, isTrackPlayerSupported, safeTrackPlayerCall, getEventConstant, getStateConstant } from '../lib/audio/trackPlayerSafe';
 import { PLAYER_STATE_STORAGE_KEY } from '../lib/audio/constants';
+
+// Get Event and State dynamically at runtime (they may be null if TrackPlayer isn't loaded)
+let Event: any = null;
+let State: any = null;
+try {
+  const rntp = require('react-native-track-player');
+  Event = rntp.Event;
+  State = rntp.State;
+} catch {
+  // Fallback to safe wrappers
+  Event = getEventConstant();
+  State = getStateConstant();
+}
 
 // Single in-memory cache to avoid reading storage too often
 let sleepEndTs: number | null = null;
@@ -24,7 +37,9 @@ function startTimerGuard() {
     if (now >= sleepEndTs) {
       // Time's up: stop playback and clear notification
       try {
-        await TrackPlayer.stop();
+        if (TrackPlayer && typeof TrackPlayer.stop === 'function') {
+          await TrackPlayer.stop();
+        }
       } catch (error) {
         console.warn('Failed to stop TrackPlayer:', error);
       }
@@ -42,6 +57,11 @@ function clearTimerGuard() {
 }
 
 export default async function TrackPlayerService() {
+  if (!isTrackPlayerSupported() || !TrackPlayer) {
+    console.warn('TrackPlayer not available (Expo Go mode) - service will not start');
+    return;
+  }
+
   try {
     console.log('🎵 TrackPlayer service starting...');
     

@@ -11,7 +11,26 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
-import TrackPlayer, { Event as TrackPlayerEvent, State as TrackPlayerState } from 'react-native-track-player';
+// Try direct import first, fall back to safe wrapper
+let TrackPlayerDirect: any = null;
+let TrackPlayerEventDirect: any = null;
+let TrackPlayerStateDirect: any = null;
+let directLoadError: string | null = null;
+
+try {
+  const rntp = require('react-native-track-player');
+  // The default export is the TrackPlayer object
+  TrackPlayerDirect = rntp.default || rntp;
+  // Event and State are named exports, not properties of default
+  TrackPlayerEventDirect = rntp.Event;
+  TrackPlayerStateDirect = rntp.State;
+  console.log('✅ Direct TrackPlayer import successful, Event:', !!TrackPlayerEventDirect, 'State:', !!TrackPlayerStateDirect);
+} catch (e: any) {
+  directLoadError = e?.message || 'Unknown error';
+  console.log('ℹ️ Direct TrackPlayer import failed:', directLoadError);
+}
+
+import { TrackPlayer as TrackPlayerSafe, getEventConstant, getStateConstant, isTrackPlayerSupported, getDetectionLog } from '../../lib/audio/trackPlayerSafe';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
@@ -44,8 +63,31 @@ export default function SleepSessionScreen() {
     );
   }
 
+  // Check if TrackPlayer is available (not in Expo Go)
+  // Prefer direct import constants if available
+  const TrackPlayerEvent = TrackPlayerEventDirect || getEventConstant();
+  const TrackPlayerState = TrackPlayerStateDirect || getStateConstant();
+  const isTrackPlayerReady = (!!TrackPlayerDirect || isTrackPlayerSupported()) && TrackPlayerEvent && TrackPlayerState;
+
   // Check if audio is available for this combination
-  const hasAudio = audioUrl && !audioUrl.includes('example.com');
+  const hasAudio = audioUrl && !audioUrl.includes('example.com') && isTrackPlayerReady;
+
+  // One-time debug logging on mount
+  const hasLoggedRef = useRef(false);
+  useEffect(() => {
+    if (!hasLoggedRef.current) {
+      hasLoggedRef.current = true;
+      console.log('🎵 Sleep Session Audio Debug:', {
+        directImportWorked: !!TrackPlayerDirect,
+        directLoadError,
+        isTrackPlayerSupported: isTrackPlayerSupported(),
+        isTrackPlayerReady,
+        hasAudio,
+        audioUrl: audioUrl || '(none)',
+        detectionLog: getDetectionLog(),
+      });
+    }
+  }, []);
 
   const [position, setPosition] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -93,9 +135,9 @@ export default function SleepSessionScreen() {
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (state) => {
       if (state === 'active') {
-        if (hasAudio) {
+        if (hasAudio && isTrackPlayerReady && TrackPlayerDirect) {
           try {
-            const trackPlayerState = await TrackPlayer.getState();
+            const trackPlayerState = await TrackPlayerDirect.getState();
             const isCurrentlyPlaying = trackPlayerState === TrackPlayerState.Playing;
             console.log('📱 App became active, syncing state:', isCurrentlyPlaying);
             if (isCurrentlyPlaying !== isPlaying) {
@@ -112,34 +154,41 @@ export default function SleepSessionScreen() {
         }
 
         if (sessionEndTime.current && Date.now() >= sessionEndTime.current) {
-          try {
-            await TrackPlayer.stop();
-          } catch {}
+          if (TrackPlayerDirect) {
+            try {
+              await TrackPlayerDirect.stop();
+            } catch {}
+          }
           finishSession();
         }
       }
     });
 
-    const playbackSub = TrackPlayer.addEventListener(TrackPlayerEvent.PlaybackState, async ({ state }) => {
-      console.log('🎵 Playback state updated (component listener):', state);
-      if (state === TrackPlayerState.Playing) {
-        if (!isPlaying) {
-          setIsPlaying(true);
-          resumeTimer();
+    let playbackSub: any = null;
+    if (isTrackPlayerReady && TrackPlayerDirect) {
+      playbackSub = TrackPlayerDirect.addEventListener(
+        TrackPlayerEvent.PlaybackState,
+        async ({ state }: { state: any }) => {
+        console.log('🎵 Playback state updated (component listener):', state);
+        if (state === TrackPlayerState.Playing) {
+          if (!isPlaying) {
+            setIsPlaying(true);
+            resumeTimer();
+          }
+          await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'playing');
+        } else if (state === TrackPlayerState.Paused || state === TrackPlayerState.Stopped) {
+          if (isPlaying) {
+            setIsPlaying(false);
+            pauseTimer();
+          }
+          await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'paused');
         }
-        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'playing');
-      } else if (state === TrackPlayerState.Paused || state === TrackPlayerState.Stopped) {
-        if (isPlaying) {
-          setIsPlaying(false);
-          pauseTimer();
-        }
-        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'paused');
-      }
-    });
+      });
+    }
 
     return () => {
       sub.remove();
-      playbackSub.remove();
+      playbackSub?.remove();
     };
   }, [hasAudio, isPlaying]);
 
@@ -166,39 +215,54 @@ export default function SleepSessionScreen() {
       
       // 2. Check if audio URL is valid
       if (!hasAudio) {
-        console.warn('🔇 No audio available for this coach+class combination, running timer-only session');
+        console.warn('🔇 No audio available (or Expo Go mode), running timer-only session');
         // Start timer without audio
         sessionEndTime.current = Date.now() + timerSeconds * 60_000;
         console.log('⏰ Timer-only session end time:', new Date(sessionEndTime.current).toLocaleTimeString());
+        setIsPlaying(true); // Set playing state for UI
         startTimer();
         return;
       }
       
-      // 3. Queue single track with TrackPlayer
+      // 3. Ensure TrackPlayer is initialized before using it
       console.log('🎵 Loading audio:', audioUrl);
-      try {
-        await TrackPlayer.reset();
-        await TrackPlayer.add({
-          id: `${coach.id}-${cls.id}`,
-          url: audioUrl!,
-          title: `${coach.name} — ${getClassDisplayName()}`,
-          artist: 'Theta',
-          artwork: coach.image_url || undefined,
-        });
-        await TrackPlayer.play();
-        setIsPlaying(true);
-        console.log('✅ TrackPlayer started successfully');
-        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'playing');
-      } catch (trackPlayerError) {
-        console.warn('TrackPlayer failed, falling back to timer-only session:', trackPlayerError);
+      if (isTrackPlayerReady && TrackPlayerDirect) {
+        try {
+          // First ensure player is set up (idempotent - won't reinitialize if already done)
+          try {
+            await TrackPlayerDirect.getState();
+            console.log('✅ TrackPlayer already initialized');
+          } catch {
+            console.log('🎵 Initializing TrackPlayer...');
+            await TrackPlayerDirect.setupPlayer({ waitForBuffer: true });
+            console.log('✅ TrackPlayer initialized');
+          }
+          
+          // Now we can safely use the player
+          await TrackPlayerDirect.reset();
+          await TrackPlayerDirect.add({
+            id: `${coach.id}-${cls.id}`,
+            url: audioUrl!,
+            title: `${coach.name} — ${getClassDisplayName()}`,
+            artist: 'Theta',
+            artwork: coach.image_url || undefined,
+          });
+          await TrackPlayerDirect.play();
+          setIsPlaying(true);
+          console.log('✅ TrackPlayer started successfully');
+          await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'playing');
+        } catch (trackPlayerError) {
+          console.warn('TrackPlayer failed, falling back to timer-only session:', trackPlayerError);
+          setIsPlaying(true);
+        }
+      } else {
+        console.warn('TrackPlayer not available, starting timer-only session');
         setIsPlaying(true);
       }
       
       // 4. Set absolute end time (ms since epoch)
       sessionEndTime.current = Date.now() + timerSeconds * 60_000;
       await AsyncStorage.setItem('theta_sleep_end_ts', String(sessionEndTime.current));
-      
-      // 5. Session completion notification removed - not needed for user experience
       
       // 6. Start countdown timer
       console.log('⏰ Session end time set to:', new Date(sessionEndTime.current).toLocaleTimeString());
@@ -216,23 +280,23 @@ export default function SleepSessionScreen() {
 
   // TrackPlayer audio position tracking and state sync
   useEffect(() => {
-    if (!hasAudio || !TrackPlayer) return;
+    if (!hasAudio || !isTrackPlayerReady || !TrackPlayerDirect) return;
     
     const updatePosition = async () => {
       try {
-        const position = await TrackPlayer.getPosition();
-        const duration = await TrackPlayer.getDuration();
+        const position = await TrackPlayerDirect.getPosition();
+        const duration = await TrackPlayerDirect.getDuration();
         setAudioPosition(position * 1000); // Convert to milliseconds
         setAudioDuration(duration * 1000); // Convert to milliseconds
       } catch (error) {
-        console.warn('Failed to get audio position:', error);
+        // Silently ignore - player might not be ready yet
       }
     };
     
     // Sync playback state with external controls
     const syncPlaybackState = async () => {
       try {
-        const state = await TrackPlayer.getState();
+        const state = await TrackPlayerDirect.getState();
         const isCurrentlyPlaying = state === TrackPlayerState.Playing;
         
         if (isCurrentlyPlaying !== isPlaying) {
@@ -281,9 +345,9 @@ export default function SleepSessionScreen() {
       }).catch(() => {});
 
       // Stop TrackPlayer and clear stored timer
-      if (TrackPlayer) {
+      if (isTrackPlayerReady && TrackPlayerDirect) {
         try {
-          await TrackPlayer.stop();
+          await TrackPlayerDirect.stop();
         } catch (error) {
           console.warn('Failed to stop TrackPlayer:', error);
         }
@@ -315,12 +379,14 @@ export default function SleepSessionScreen() {
     }
     
     // Stop TrackPlayer if it's running
-    try {
-      await TrackPlayer.stop();
-      await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
-      console.log('🛑 TrackPlayer stopped during cleanup');
-    } catch (error) {
-      console.warn('Failed to stop TrackPlayer during cleanup:', error);
+    if (isTrackPlayerReady && TrackPlayerDirect) {
+      try {
+        await TrackPlayerDirect.stop();
+        await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
+        console.log('🛑 TrackPlayer stopped during cleanup');
+      } catch (error) {
+        console.warn('Failed to stop TrackPlayer during cleanup:', error);
+      }
     }
     
     // Reset session state
@@ -354,22 +420,31 @@ export default function SleepSessionScreen() {
       return;
     }
     
+    // Fallback if no audio (Expo Go): Toggle timer
     if (!hasAudio) {
-      console.warn('No audio available to play');
+      if (isPlaying) {
+        setIsPlaying(false);
+        pauseTimer();
+        console.log('⏸️ Timer paused (no TrackPlayer)');
+      } else {
+        setIsPlaying(true);
+        resumeTimer();
+        console.log('▶️ Timer playing (no TrackPlayer)');
+      }
       return;
     }
     
-    if (TrackPlayer) {
+    if (isTrackPlayerReady && TrackPlayerDirect) {
       try {
-        const state = await TrackPlayer.getState();
+        const state = await TrackPlayerDirect.getState();
         console.log('🎵 TrackPlayer state:', state);
         if (state === TrackPlayerState.Playing) {
-          await TrackPlayer.pause();
+          await TrackPlayerDirect.pause();
           setIsPlaying(false);
           pauseTimer();
           console.log('⏸️ TrackPlayer paused');
         } else {
-          await TrackPlayer.play();
+          await TrackPlayerDirect.play();
           setIsPlaying(true);
           resumeTimer();
           console.log('▶️ TrackPlayer playing');
@@ -388,16 +463,14 @@ export default function SleepSessionScreen() {
         }
       }
     } else {
-      // TrackPlayer not available, just toggle the timer
-      if (isPlaying) {
-        setIsPlaying(false);
-        pauseTimer();
-        console.log('⏸️ Timer paused (no TrackPlayer)');
-      } else {
-        setIsPlaying(true);
-        resumeTimer();
-        console.log('▶️ Timer playing (no TrackPlayer)');
-      }
+        // Fallback catch-all
+        if (isPlaying) {
+            setIsPlaying(false);
+            pauseTimer();
+        } else {
+            setIsPlaying(true);
+            resumeTimer();
+        }
     }
   };
 
@@ -413,7 +486,11 @@ export default function SleepSessionScreen() {
     router.back();
   };
 
-  const progress = audioDuration ? audioPosition/audioDuration : 0;
+  // Display logic: If audio exists, use audio progress. If not, use timer progress.
+  const displayPosition = hasAudio ? audioPosition : position;
+  const displayDuration = hasAudio ? audioDuration : (timerSeconds * 60_000);
+  const progress = displayDuration > 0 ? displayPosition / displayDuration : 0;
+
   const fmt = (ms:number) => {
     const s=Math.floor(ms/1000), m=Math.floor(s/60), sec=s%60;
     return `${m}:${sec.toString().padStart(2,'0')}`;
@@ -434,7 +511,10 @@ export default function SleepSessionScreen() {
     }
     timerRef.current = setInterval(() => {
       const rem = Math.max(0, sessionEndTime.current - Date.now());
-      const sessionProgress = timerSeconds * 60_000 - rem;
+      // sessionProgress increases from 0 to duration
+      const sessionProgress = (timerSeconds * 60_000) - rem;
+      
+      // Update fallback position state
       setPosition(sessionProgress);
       
       // Debug timer progress
@@ -446,7 +526,7 @@ export default function SleepSessionScreen() {
         console.log('🎯 Timer finished - calling finishSession');
         finishSession();
       }
-    }, 500);
+    }, 500); // update every 500ms
     console.log('✅ Timer started successfully');
   };
 
@@ -475,11 +555,11 @@ export default function SleepSessionScreen() {
 
   // Seek functionality
   const seekTo = async (seekPercentage: number) => {
-    if (!hasAudio || !audioDuration || !TrackPlayer) return;
+    if (!hasAudio || !audioDuration || !isTrackPlayerReady || !TrackPlayerDirect) return;
     
     try {
       const seekTime = (seekPercentage / 100) * audioDuration;
-      await TrackPlayer.seekTo(seekTime / 1000); // Convert milliseconds to seconds
+      await TrackPlayerDirect.seekTo(seekTime / 1000); // Convert milliseconds to seconds
       // Don't update session position - that should continue based on real time
     } catch (error) {
       console.warn('Failed to seek audio:', error);
@@ -535,6 +615,15 @@ export default function SleepSessionScreen() {
         <ScreenBackground source={require('../../assets/images/THETA-BG.png')} />
 
         <SafeAreaView style={styles.container}>
+        {/* DEBUG BANNER - Only shows in development */}
+        {__DEV__ && (
+          <View style={{backgroundColor: hasAudio ? '#4CAF50' : '#FF5722', padding: 6, borderRadius: 6, marginHorizontal: 20, marginBottom: 4}}>
+            <Text style={{color: 'white', fontSize: 10, textAlign: 'center'}}>
+              {hasAudio ? '✅ Audio Mode' : '⏱️ Timer Only'} | TP: {isTrackPlayerReady ? '✓' : '✗'} | URL: {audioUrl ? '✓' : '✗'}
+            </Text>
+          </View>
+        )}
+        
         {/* HEADER */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => {
@@ -543,7 +632,7 @@ export default function SleepSessionScreen() {
           }}>
             <ArrowDown color="white" size={24}/>
           </TouchableOpacity>
-          <Text style={styles.title}>Sleep Session 3</Text>
+          <Text style={styles.title}>Sleep Session</Text>
           <View style={{width:24}}/>
         </View>
 
@@ -585,8 +674,8 @@ export default function SleepSessionScreen() {
               console.log('🎮 Play button pressed - calling togglePlay');
               togglePlay();
             }}
-            disabled={!hasAudio || isInitializing}
-            style={(!hasAudio || isInitializing) && styles.playButtonDisabled}
+            disabled={!hasAudio && isInitializing}
+            style={(isInitializing) && styles.playButtonDisabled}
           >
             <LinearGradient
               colors={isPlaying ? ['#413A6D', '#221D55'] : ['#B3ACE9', '#5B45DD']}
@@ -638,8 +727,8 @@ export default function SleepSessionScreen() {
             </View>
           </TouchableOpacity>
           <View style={styles.progressTimer}>
-          <Text style={styles.timeText}>{fmt(audioPosition)}</Text>
-          <Text style={styles.fullText}>{fmt(audioDuration)}</Text>
+          <Text style={styles.timeText}>{fmt(displayPosition)}</Text>
+          <Text style={styles.fullText}>{fmt(displayDuration)}</Text>
           </View>
         </View>
 
@@ -884,4 +973,3 @@ const styles = StyleSheet.create({
   // },
 
 }); 
-
