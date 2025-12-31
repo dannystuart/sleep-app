@@ -9,9 +9,6 @@ export default function SessionLayout() {
         presentation: 'fullScreenModal',   // modal covers notch + home bar
         animation: 'slide_from_bottom',    // ⬆️ slide up, ⬇️ slide down
         contentStyle: { backgroundColor: '#000' }, // Match component background
-        statusBarStyle: 'light',
-        statusBarTranslucent: false,
-        statusBarBackgroundColor: '#000', // Android only - match component
         freezeOnBlur: true,
       }}
     />

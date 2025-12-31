@@ -39,7 +39,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>22</string>
+    <string>24</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>LSMinimumSystemVersion</key>
@@ -90,6 +90,6 @@
     <key>UIUserInterfaceStyle</key>
     <string>Automatic</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
-    <false/>
+    <true/>
   </dict>
 </plist>

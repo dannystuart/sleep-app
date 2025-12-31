@@ -9,24 +9,25 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "splash": {
-      "image": "./assets/splash/splash-logo.png",
+      "image": "./assets/splash/splash-logo-new-lg.png",
       "backgroundColor": "#0F0C15",
       "resizeMode": "contain"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.theta.sleepapp",
-      "buildNumber": "22",
+      "buildNumber": "25",
       "splash": {
-        "image": "./assets/splash/splash-logo.png",
+        "image": "./assets/splash/splash-logo-new-lg.png",
         "backgroundColor": "#0F0C15",
         "resizeMode": "contain",
         "dark": {
-          "image": "./assets/splash/splash-logo.png",
+          "image": "./assets/splash/splash-logo-new-lg.png",
           "backgroundColor": "#0F0C15"
         }
       },
       "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": true,
         "UIBackgroundModes": [
           "fetch",
           "remote-notification",
