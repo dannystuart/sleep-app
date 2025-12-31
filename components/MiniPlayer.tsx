@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Play, Pause, X } from 'lucide-react-native';
@@ -34,10 +34,16 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
   const [isVisible, setIsVisible] = useState(false);
   const slideAnim = useState(new Animated.Value(100))[0];
   const opacityAnim = useState(new Animated.Value(1))[0];
+  const isManuallyStoppingRef = useRef(false);
 
   // Check if there's an active session
   useEffect(() => {
     const checkActiveSession = async () => {
+      // Don't check if we're manually stopping
+      if (isManuallyStoppingRef.current) {
+        return;
+      }
+
       try {
         const active = await isSleepSessionActive();
 
@@ -62,14 +68,24 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
             friction: 10,
           }).start();
         } else {
-          Animated.timing(slideAnim, {
-            toValue: 100,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => setIsVisible(false));
+          // Only animate slide if not manually stopping
+          if (!isManuallyStoppingRef.current) {
+            Animated.timing(slideAnim, {
+              toValue: 100,
+              duration: 200,
+              useNativeDriver: true,
+            }).start(() => {
+              // Defer state update to avoid React insertion effect error
+              setTimeout(() => {
+                setIsVisible(false);
+              }, 0);
+            });
+          }
         }
       } catch (error) {
-        setIsVisible(false);
+        if (!isManuallyStoppingRef.current) {
+          setIsVisible(false);
+        }
       }
     };
 
@@ -104,14 +120,21 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
 
   const handleStopSession = async () => {
     try {
-      // Fade out in place (no position change)
+      // Mark that we're manually stopping to prevent checkActiveSession from animating
+      isManuallyStoppingRef.current = true;
+
+      // Fade out in place (no position change - keep slideAnim at current value)
       Animated.timing(opacityAnim, {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start(() => {
-        setIsVisible(false);
-        opacityAnim.setValue(1); // Reset for next time
+        // Defer state update to avoid React insertion effect error
+        setTimeout(() => {
+          setIsVisible(false);
+          opacityAnim.setValue(1); // Reset for next time
+          isManuallyStoppingRef.current = false; // Reset flag
+        }, 0);
       });
 
       // Stop the session (this also sets the stopped flag)
@@ -119,6 +142,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ coachName, className }) 
       setIsPlaying(false);
     } catch (error) {
       console.warn('Failed to stop session:', error);
+      isManuallyStoppingRef.current = false; // Reset flag on error
     }
   };
 

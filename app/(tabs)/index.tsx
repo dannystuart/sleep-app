@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, AppState } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Asset } from 'expo-asset';
@@ -36,13 +36,35 @@ export default function HomeScreen() {
     visible: showAnnouncement && (app.announcements?.length ?? 0) > 0
   });
 
+  // Load streak state on mount and refresh when app becomes active
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const loadStreak = async () => {
       const s = await streakApi.getState();
       if (mounted) setStreakUI(s);
-    })();
-    return () => { mounted = false; };
+    };
+    loadStreak();
+    
+    // Refresh streak when app becomes active (fixes issue where streaks don't update)
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && mounted) {
+        console.log('🔄 App active - refreshing streak state');
+        loadStreak();
+      }
+    });
+    
+    // Also refresh periodically while app is active (every 5 seconds)
+    const interval = setInterval(() => {
+      if (mounted && AppState.currentState === 'active') {
+        loadStreak();
+      }
+    }, 5000);
+    
+    return () => { 
+      mounted = false;
+      subscription.remove();
+      clearInterval(interval);
+    };
   }, [streakApi]);
 
   // Auto-show announcement on mount (if any queued)
@@ -111,6 +133,9 @@ export default function HomeScreen() {
   const [lastLogoTap, setLastLogoTap] = useState(0);
 
   const handleLogoTap = () => {
+    // Only allow debug panel in development
+    if (!__DEV__) return;
+
     const now = Date.now();
     const timeSinceLastTap = now - lastLogoTap;
     

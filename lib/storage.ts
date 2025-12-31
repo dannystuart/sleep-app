@@ -8,6 +8,8 @@ export const STORAGE_KEYS = {
   diary: '@theta/diary',
   announcements: '@theta/announcements',
   hasOnboarded: '@theta/hasOnboarded',
+  lastError: '@theta/lastError',
+  lastNotification: '@theta/lastNotification',
 } as const;
 
 export type StorageKey = keyof typeof STORAGE_KEYS;

@@ -10,20 +10,20 @@
     "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash/splash-logo.png",
-      "backgroundColor": "#171221",
+      "backgroundColor": "#0F0C15",
       "resizeMode": "contain"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.theta.sleepapp",
-      "buildNumber": "15",
+      "buildNumber": "22",
       "splash": {
         "image": "./assets/splash/splash-logo.png",
-        "backgroundColor": "#171221",
+        "backgroundColor": "#0F0C15",
         "resizeMode": "contain",
         "dark": {
           "image": "./assets/splash/splash-logo.png",
-          "backgroundColor": "#171221"
+          "backgroundColor": "#0F0C15"
         }
       },
       "infoPlist": {

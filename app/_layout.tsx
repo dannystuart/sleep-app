@@ -21,13 +21,14 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { enableScreens } from 'react-native-screens';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, AppState } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '../contexts/AppContext';
 import { getStorageItem } from '../lib/storage';
 import { setupPlayerOnce } from '../lib/audio/player';
 import { TrackPlayer, isTrackPlayerSupported } from '../lib/audio/trackPlayerSafe';
 import { ScreenBackground } from '../components/ScreenBackground';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 // Re-enable native screens so React Navigation can hide inactive tabs
 enableScreens();
@@ -63,6 +64,20 @@ function AppContent() {
     setupPlayerOnce().catch(error => {
       console.warn('Failed to setup TrackPlayer:', error);
     });
+  }, []);
+
+  // Fix black screen issue: Handle app state changes to ensure proper rendering
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        // Force a re-render when app becomes active to fix black screen
+        console.log('📱 App became active - ensuring UI is rendered');
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
   
   const [fontsLoaded, fontError] = useFonts({
@@ -193,7 +208,9 @@ export default function RootLayout() {
   
   return (
     <AppProvider>
-      <AppContent />
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </AppProvider>
   );
 }

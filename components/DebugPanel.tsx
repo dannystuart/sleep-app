@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useApp } from '../contexts/AppContext';
 import { isTrackPlayerSupported, getDetectionLog, getLoadError } from '../lib/audio/trackPlayerSafe';
-import { setStorageItem } from '../lib/storage';
+import { setStorageItem, getStorageItem, removeStorageItem } from '../lib/storage';
 import { useRouter } from 'expo-router';
 import type { DiaryEntry } from '../types';
 
@@ -14,6 +14,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ onClose }) => {
   const { diary, streak, devPushAnnouncement, devShowTestAnnouncement, announcements, coaches, scheduleDailyReminder, scheduleBedtimeReminder, scheduleMorningReminder, scheduleAllDailyNotifications, cancelAllLocalReminders, ensureLocalNotifPermission, selectedCoachId, selectedClassId, sessionAudio } = useApp() as any;
   const router = useRouter();
   const [streakData, setStreakData] = React.useState<any>(null);
+  const [lastError, setLastError] = React.useState<any>(null);
+  const [lastNotification, setLastNotification] = React.useState<any>(null);
   const trackPlayerSupported = isTrackPlayerSupported();
   const detectionLog = getDetectionLog();
   const loadError = getLoadError();
@@ -22,12 +24,30 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ onClose }) => {
   const selectedAudioUrlShort = selectedAudioUrl.length > 80 ? `${selectedAudioUrl.slice(0, 80)}…` : selectedAudioUrl;
 
   React.useEffect(() => {
-    const loadStreak = async () => {
+    const loadData = async () => {
       const data = await streak.getState();
       setStreakData(data);
       console.log('🔍 Debug panel - streak data:', data);
+
+      const error = await getStorageItem('lastError');
+      if (error) {
+        try {
+          setLastError(JSON.parse(error));
+        } catch {
+          setLastError({ message: error });
+        }
+      }
+
+      const notification = await getStorageItem('lastNotification');
+      if (notification) {
+        try {
+          setLastNotification(JSON.parse(notification));
+        } catch {
+          setLastNotification({ title: 'Error parsing', body: notification });
+        }
+      }
     };
-    loadStreak();
+    loadData();
   }, [streak]);
 
   // Debug: Check if functions are available
@@ -51,6 +71,56 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ onClose }) => {
       </View>
       
       <ScrollView style={styles.scrollView}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>⚠️ Last Error</Text>
+          {lastError ? (
+            <>
+              <Text style={styles.text} numberOfLines={2}>
+                {lastError.timestamp ? new Date(lastError.timestamp).toLocaleTimeString() : ''} - {lastError.message}
+              </Text>
+              <TouchableOpacity
+                onPress={async () => {
+                  await removeStorageItem('lastError');
+                  setLastError(null);
+                }}
+                style={[styles.debugButton, { backgroundColor: '#ef4444' }]}
+              >
+                <Text style={styles.debugButtonText}>Clear Error</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.text}>No errors recorded</Text>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔔 Last Notification</Text>
+          {lastNotification ? (
+            <>
+              <Text style={[styles.text, { fontWeight: 'bold' }]} numberOfLines={1}>
+                {lastNotification.title || 'No Title'}
+              </Text>
+              <Text style={styles.text} numberOfLines={2}>
+                {lastNotification.body || 'No Body'}
+              </Text>
+              <Text style={[styles.text, { fontSize: 6, color: '#aaa' }]} numberOfLines={1}>
+                {lastNotification.timestamp ? new Date(lastNotification.timestamp).toLocaleTimeString() : ''}
+              </Text>
+              <TouchableOpacity
+                onPress={async () => {
+                  await removeStorageItem('lastNotification');
+                  setLastNotification(null);
+                }}
+                style={[styles.debugButton, { backgroundColor: '#ef4444' }]}
+              >
+                <Text style={styles.debugButtonText}>Clear</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.text}>No notifications recorded</Text>
+          )}
+        </View>
+
         {/* Streak Controls */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🧪 Streak Controls</Text>

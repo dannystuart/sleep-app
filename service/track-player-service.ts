@@ -17,7 +17,8 @@ try {
 
 // Single in-memory cache to avoid reading storage too often
 let sleepEndTs: number | null = null;
-let timerCheckInterval: NodeJS.Timer | null = null;
+// Flag to prevent multiple stop attempts
+let isStoppingSession = false;
 
 async function loadSleepEndTs() {
   try {
@@ -29,31 +30,52 @@ async function loadSleepEndTs() {
   }
 }
 
-function startTimerGuard() {
-  if (timerCheckInterval) return;
-  timerCheckInterval = setInterval(async () => {
-    if (!sleepEndTs) return;
-    const now = Date.now();
-    if (now >= sleepEndTs) {
-      // Time's up: stop playback and clear notification
-      try {
-        if (TrackPlayer && typeof TrackPlayer.stop === 'function') {
-          await TrackPlayer.stop();
-        }
-      } catch (error) {
-        console.warn('Failed to stop TrackPlayer:', error);
+// Check timer and stop if expired - called from PlaybackProgressUpdated event
+// This event fires even when app is backgrounded because it's native
+async function checkAndStopIfTimerExpired() {
+  if (isStoppingSession) return;
+  
+  // Always reload from storage to stay in sync with UI pause/resume adjustments
+  try {
+    const raw = await AsyncStorage.getItem('theta_sleep_end_ts');
+    sleepEndTs = raw ? Number(raw) : null;
+  } catch (error) {
+    console.warn('Failed to refresh sleep end time:', error);
+    sleepEndTs = null;
+  }
+
+  if (!sleepEndTs) {
+    return;
+  }
+  
+  const now = Date.now();
+  if (now >= sleepEndTs) {
+    // Prevent multiple stop attempts
+    isStoppingSession = true;
+    
+    // Time's up: stop playback and mark session as completed
+    console.log('⏰ Sleep timer expired (background) - stopping audio and ending session');
+    try {
+      if (TrackPlayer && typeof TrackPlayer.stop === 'function') {
+        await TrackPlayer.stop();
       }
-      clearTimerGuard();
+      // Set a flag that the session timer has expired (so sleep session screen can complete it)
+      await AsyncStorage.setItem('theta_session_timer_expired', 'true');
+      await AsyncStorage.removeItem('theta_sleep_end_ts');
+      await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
+      sleepEndTs = null;
+      console.log('✅ Timer expired flag set - session will complete when app becomes active');
+    } catch (error) {
+      console.warn('Failed to stop TrackPlayer:', error);
+    } finally {
+      isStoppingSession = false;
     }
-  }, 1000); // 1s resolution is fine for a sleep timer
+  }
 }
 
-function clearTimerGuard() {
-  if (timerCheckInterval) {
-    clearInterval(timerCheckInterval);
-    timerCheckInterval = null;
-  }
-  sleepEndTs = null;
+// Reset the stopping flag when a new session starts
+function resetStoppingFlag() {
+  isStoppingSession = false;
 }
 
 export default async function TrackPlayerService() {
@@ -65,17 +87,17 @@ export default async function TrackPlayerService() {
   try {
     console.log('🎵 TrackPlayer service starting...');
     
-    // When the service starts, load any scheduled end time and begin checking
+    // When the service starts, load any scheduled end time
     await loadSleepEndTs();
     if (sleepEndTs) {
-      console.log('⏰ Found existing sleep timer, starting guard');
-      startTimerGuard();
+      console.log('⏰ Found existing sleep timer end:', new Date(sleepEndTs).toLocaleTimeString());
     }
 
     // Remote control events
     TrackPlayer.addEventListener(Event.RemotePlay, async () => {
       console.log('🎮 Remote play pressed');
       try {
+        resetStoppingFlag(); // Allow timer checks again
         await TrackPlayer.play();
         await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'playing');
       } catch (error) {
@@ -97,8 +119,9 @@ export default async function TrackPlayerService() {
       console.log('🎮 Remote stop pressed');
       try {
         await TrackPlayer.stop();
-        clearTimerGuard();
+        sleepEndTs = null;
         await AsyncStorage.removeItem('theta_sleep_end_ts');
+        await AsyncStorage.removeItem('theta_session_timer_expired');
         await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'stopped');
         console.log('🛑 Session stopped from remote control');
       } catch (error) {
@@ -106,23 +129,27 @@ export default async function TrackPlayerService() {
       }
     });
     
-    TrackPlayer.addEventListener(Event.RemoteSeek, ({ position }) => {
+    TrackPlayer.addEventListener(Event.RemoteSeek, ({ position }: { position: number }) => {
       console.log('🎮 Remote seek to:', position);
-      TrackPlayer.seekTo(position).catch(error => console.warn('RemoteSeek failed:', error));
+      TrackPlayer.seekTo(position).catch((error: unknown) => console.warn('RemoteSeek failed:', error));
     });
 
-    // Keep an ear on progress to (re)load timer end if needed
-    TrackPlayer.addEventListener(Event.PlaybackState, async ({ state }) => {
+    // Use PlaybackProgressUpdated event to check timer - this fires even when app is backgrounded
+    // because it's a native event, unlike JS setInterval which gets suspended
+    TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, async () => {
+      // Check timer on every progress update (fires based on progressUpdateEventInterval from setup)
+      await checkAndStopIfTimerExpired();
+    });
+
+    // Keep an ear on playback state changes
+    TrackPlayer.addEventListener(Event.PlaybackState, async ({ state }: { state: number }) => {
       console.log('🎵 Playback state changed:', state);
-      // If we resume or start, make sure timer guard is alive and has an end time
       if (state === State.Playing) {
-        if (!sleepEndTs) {
-          console.log('⏰ Loading sleep timer from storage');
-          await loadSleepEndTs();
-        }
+        resetStoppingFlag(); // Allow timer checks when playback starts
+        // Reload timer end time when playback starts
+        await loadSleepEndTs();
         if (sleepEndTs) {
-          console.log('⏰ Starting timer guard');
-          startTimerGuard();
+          console.log('⏰ Timer active, will stop at:', new Date(sleepEndTs).toLocaleTimeString());
         }
         await AsyncStorage.setItem(PLAYER_STATE_STORAGE_KEY, 'playing');
       } else if (state === State.Paused || state === State.Stopped) {

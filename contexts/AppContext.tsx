@@ -4,6 +4,7 @@ import { getStorageItem, setStorageItem } from '../lib/storage';
 import { AppContextType, AppState, Coach, Class, SessionAudio, SessionEvent, DiaryEntry, StreakState, StreakPublicState } from '../types';
 import { registerForPushNotificationsAsync } from '../lib/notifications';
 import { attachLocalDevGlobals, scheduleDailyReminder, cancelAllLocalReminders, scheduleOneOffIn, ensureLocalNotifPermission, scheduleBedtimeReminder, scheduleMorningReminder, scheduleAllDailyNotifications } from '../lib/localNotifications';
+import { stopSleepSession } from '../lib/audio/player';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -83,6 +84,7 @@ export const COACH_UNLOCK_MILESTONES = [3, 6, 8, 10];
 
 // Pure helper to determine if a coach is unlocked based on best streak
 // unlock_streak null/0 means always unlocked; otherwise best >= unlock_streak
+// Once unlocked, coaches stay unlocked permanently (based on best streak ever achieved)
 export function isCoachUnlocked(bestStreak: number, coach: Coach): boolean {
   const unlockRequirement = coach.unlock_streak;
   
@@ -143,7 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [session, setSession] = useState<any>(null);
   
   // Test mode - set to true to allow multiple sessions per day
-  const TEST_MODE = true;
+  const TEST_MODE = false;
 
   // ===== Announcements (queued to show on next app open) =====
   type Announcement =
@@ -199,6 +201,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     })();
 
+    // Listen for incoming notifications while app is open
+    const receivedSub = Notifications.addNotificationReceivedListener(async (notification) => {
+      console.log('🔔 Notification received in foreground:', notification);
+      try {
+        await setStorageItem('lastNotification', JSON.stringify({
+          title: notification.request.content.title,
+          body: notification.request.content.body,
+          data: notification.request.content.data,
+          timestamp: new Date().toISOString()
+        }));
+      } catch (e) {
+        console.error('Failed to save notification:', e);
+      }
+    });
+
     sub = Notifications.addNotificationResponseReceivedListener((resp) => {
       const data = resp.notification.request.content.data as any;
       if (data?.screen) {
@@ -207,7 +224,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    return () => sub?.remove();
+    return () => {
+      sub?.remove();
+      receivedSub.remove();
+    };
   }, [router]);
 
   // Handle push notifications
@@ -393,7 +413,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Load streak and diary data
       if (storedStreak) {
         try {
-          setStreak(JSON.parse(storedStreak));
+          const parsed = JSON.parse(storedStreak);
+          // Validate and sanitize loaded streak data
+          setStreak({
+            ...parsed,
+            current: typeof parsed.current === 'number' ? parsed.current : 0,
+            best: typeof parsed.best === 'number' ? parsed.best : 0,
+            // Ensure sessionsByDate is an object
+            sessionsByDate: parsed.sessionsByDate || {},
+            unlocked: Array.isArray(parsed.unlocked) ? parsed.unlocked : []
+          });
         } catch (error) {
           console.error('Error parsing stored streak:', error);
         }
@@ -486,6 +515,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
 
+      // Stop any active sleep session when settings change
+      await stopSleepSession();
+
       // Check if the new coach+class combination has session audio
       const sessionAudioExists = state.sessionAudio.some(sa => 
         sa.coach_id === id && sa.class_id === state.selectedClassId
@@ -519,6 +551,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
 
+      // Stop any active sleep session when settings change
+      await stopSleepSession();
+
       // Check if the new coach+class combination has session audio
       const sessionAudioExists = state.sessionAudio.some(sa => 
         sa.coach_id === state.selectedCoachId && sa.class_id === id
@@ -544,6 +579,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setTimer = async (seconds: number) => {
     try {
+      // Stop any active sleep session when settings change
+      await stopSleepSession();
+
       await setStorageItem('timerSeconds', seconds.toString());
       setState(prev => ({ ...prev, timerSeconds: seconds }));
       
@@ -729,6 +767,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       next.current += 1;
     } else {
       console.log('🔄 New day or gap - resetting streak to 1');
+      next.current = 1;
+    }
+
+    // Safety check: current streak should never be 0 after a session
+    if (next.current < 1) {
+      console.warn('⚠️ Streak calculation resulted in < 1, forcing to 1');
       next.current = 1;
     }
 

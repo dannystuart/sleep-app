@@ -1,5 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { setStorageItem } from '../lib/storage';
 
 interface Props {
   children: ReactNode;
@@ -21,6 +22,18 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
+    
+    // Save error to storage for debugging
+    const errorLog = JSON.stringify({
+      message: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      timestamp: new Date().toISOString()
+    });
+    
+    setStorageItem('lastError', errorLog).catch(err => 
+      console.error('Failed to save error to storage:', err)
+    );
   }
 
   render() {
