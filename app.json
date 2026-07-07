@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.theta.sleepapp",
-      "buildNumber": "22",
+      "buildNumber": "25",
       "splash": {
         "image": "./assets/splash/splash-logo.png",
         "backgroundColor": "#0F0C15",

@@ -8,6 +8,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from '../../components/SafeAreaView';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
@@ -18,7 +19,8 @@ import { useApp } from '../../contexts/AppContext';
 import { track } from '../../lib/analytics';
 
 const { width } = Dimensions.get('window');
-const maxWidth = Math.min(width, 400);
+const isPad = Platform.OS === 'ios' && Platform.isPad;
+const maxWidth = isPad ? width : Math.min(width, 400);
 
 // Remove mock data - will be replaced with real data from database
 
@@ -257,16 +259,16 @@ export default function DiaryScreen() {
   return (
     <View style={styles.screenContainer}>
       <SafeAreaView style={styles.container}>
-        <View style={[styles.mobileContainer, { maxWidth }]}>  
+        <View style={[styles.mobileContainer, { maxWidth, alignSelf: 'center' }]}>  
           {/* Top Section */}
-          <View style={styles.topHalf}>
-            <Text style={styles.title}>Sleep Diary</Text>
+          <View style={[styles.topHalf, isPad && { height: '35%', justifyContent: 'space-evenly' }]}>
+            <Text style={[styles.title, isPad && { fontSize: 32, marginBottom: 10 }]}>Sleep Diary</Text>
             
             <View style={styles.progressContainer}>
               <CircularProgress
-                size={120}
-                strokeWidth={12}
-                gapSize={18}
+                size={isPad ? 240 : 120}
+                strokeWidth={isPad ? 24 : 12}
+                gapSize={isPad ? 24 : 18}
                 segments={circleSegments}
               />
               
@@ -276,23 +278,24 @@ export default function DiaryScreen() {
             {/* Month Navigation */}
             <View style={styles.monthNavigation}>
               <TouchableOpacity 
-                style={styles.navButton}
+                style={[styles.navButton, isPad && { width: 56, height: 56, borderRadius: 28 }]}
                 onPress={handlePrevMonth}
               >
-                <ChevronLeft color="white" size={20} />
+                <ChevronLeft color="white" size={isPad ? 32 : 20} />
               </TouchableOpacity>
 
-              <Text style={styles.monthText}>{monthText}</Text>
+              <Text style={[styles.monthText, isPad && { fontSize: 24, marginHorizontal: 20 }]}>{monthText}</Text>
 
               <TouchableOpacity 
                 style={[
                   styles.navButton,
                   isNextDisabled && styles.disabledNavButton,
+                  isPad && { width: 56, height: 56, borderRadius: 28 }
                 ]}
                 onPress={handleNextMonth}
                 disabled={isNextDisabled}
               >
-                <ChevronRight color="white" size={20} />
+                <ChevronRight color="white" size={isPad ? 32 : 20} />
               </TouchableOpacity>
             </View>
           </View>

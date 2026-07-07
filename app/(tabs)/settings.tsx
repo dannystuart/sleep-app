@@ -1,12 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Platform } from 'react-native';
 import { SafeAreaView } from '../../components/SafeAreaView';
 import { ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useApp } from '../../contexts/AppContext';
 
 const { width } = Dimensions.get('window');
-const maxWidth = Math.min(width, 400);
+const isPad = Platform.OS === 'ios' && Platform.isPad;
+const maxWidth = isPad ? width : Math.min(width, 400);
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -56,10 +57,10 @@ export default function SettingsScreen() {
   return (
     <View style={styles.screenContainer}>
       <SafeAreaView style={styles.container}>
-        <View style={[styles.mobileContainer, { maxWidth }]}>
-          <View style={styles.content}>
+        <View style={[styles.mobileContainer, { maxWidth, alignSelf: 'center' }]}>
+          <View style={[styles.content, isPad && { justifyContent: 'center', gap: 40 }]}>
             {/* Header */}
-            <Text style={styles.title}>Change sleep session</Text>
+            <Text style={[styles.title, isPad && { fontSize: 32 }]}>Change sleep session</Text>
 
             {/* Coach Section */}
             <View style={styles.section}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, AppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, AppState, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Asset } from 'expo-asset';
@@ -16,7 +16,8 @@ import { track } from '../../lib/analytics';
 import { isSleepSessionActive } from '../../lib/audio/player';
 
 const { width } = Dimensions.get('window');
-const maxWidth = Math.min(width, 400);
+const isPad = Platform.OS === 'ios' && Platform.isPad;
+const maxWidth = isPad ? width : Math.min(width, 400);
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -294,9 +295,9 @@ export default function HomeScreen() {
           <NetworkStatus />
           
           {/* Mobile Container */}
-          <View style={[styles.mobileContainer, { maxWidth }]}>
+          <View style={[styles.mobileContainer, { maxWidth, alignSelf: 'center' }]}>
             {/* App Content */}
-            <View style={styles.content}>
+            <View style={[styles.content, isPad && { justifyContent: 'space-evenly', paddingBottom: 40 }]}>
               {/* Logo */}
               <TouchableOpacity 
                 style={styles.logoContainer}
@@ -314,10 +315,10 @@ export default function HomeScreen() {
                 track('open_streak_sheet').catch(() => {});
                 setShowStreakSheet(true);
               }}>
-                <View style={styles.streakCard}>
+                <View style={[styles.streakCard, isPad && { padding: 40 }]}>
                   <View style={styles.streakContent}>
                     <View style={styles.streakLeft}>
-                      <Text style={styles.streakTitle}>Your Streak</Text>
+                      <Text style={[styles.streakTitle, isPad && { fontSize: 24, marginBottom: 20 }]}>Your Streak</Text>
 
                       {/* ≤3 days: compact row (today + next 2) */}
                       {isCompact && (
@@ -356,11 +357,11 @@ export default function HomeScreen() {
                     <View style={styles.streakRight}>
                       {/* Adaptive streak message */}
                       {noStreakEver ? (
-                        <Text style={styles.streakMessage}>No streak yet — start your first session tonight to begin.</Text>
+                        <Text style={[styles.streakMessage, isPad && { fontSize: 20, lineHeight: 28 }]}>No streak yet — start your first session tonight to begin.</Text>
                       ) : streakFinished ? (
-                        <Text style={styles.streakMessage}>Start tonight with a fresh streak.</Text>
+                        <Text style={[styles.streakMessage, isPad && { fontSize: 20, lineHeight: 28 }]}>Start tonight with a fresh streak.</Text>
                       ) : (
-                        <Text style={styles.streakMessage}>You're sleeping well, keep going!</Text>
+                        <Text style={[styles.streakMessage, isPad && { fontSize: 20, lineHeight: 28 }]}>You're sleeping well, keep going!</Text>
                       )}
                       
                       {/* Coach unlock motivation 
@@ -379,10 +380,10 @@ export default function HomeScreen() {
                 {/* Cards Grid */}
                 <View style={styles.cardsGrid}>
                   {/* Coach Card */}
-                  <View style={[styles.glassCard, styles.coachCard]}>
-                    <View style={styles.coachInfo}>
-                      <Text style={styles.cardTitle}>Coach</Text>
-                      <Text style={styles.cardSubtitle}>{selectedCoach?.name || 'Select Coach'}</Text>
+                  <View style={[styles.glassCard, styles.coachCard, isPad && { padding: 32 }]}>
+                    <View style={[styles.coachInfo, isPad && { marginBottom: 32 }]}>
+                      <Text style={[styles.cardTitle, isPad && { fontSize: 24, marginBottom: 16 }]}>Coach</Text>
+                      <Text style={[styles.cardSubtitle, isPad && { fontSize: 20 }]}>{selectedCoach?.name || 'Select Coach'}</Text>
                     </View>
                     <View style={styles.coachImageContainer}>
                       <Image 
@@ -390,23 +391,23 @@ export default function HomeScreen() {
                         contentFit="cover"
                         transition={0}
                         cachePolicy="disk"
-                        style={styles.coachImage}
+                        style={[styles.coachImage, isPad && { height: 260 }]}
                       />
                     </View>
                   </View>
 
                   {/* Right Column Cards */}
-                  <View style={styles.rightColumn}>
+                  <View style={[styles.rightColumn, isPad && { gap: 32 }]}>
                     {/* Class Card */}
-                    <View style={[styles.glassCard, styles.smallCard]}>
-                      <Text style={styles.cardTitle}>Class</Text>
-                      <Text style={styles.cardSubtitle}>{getClassDisplayName()}</Text>
+                    <View style={[styles.glassCard, styles.smallCard, isPad && { padding: 32, paddingTop: 24 }]}>
+                      <Text style={[styles.cardTitle, isPad && { fontSize: 24 }]}>Class</Text>
+                      <Text style={[styles.cardSubtitle, isPad && { fontSize: 20 }]}>{getClassDisplayName()}</Text>
                     </View>
 
                     {/* Timer Card */}
-                    <View style={[styles.glassCard, styles.smallCard]}>
-                      <Text style={styles.cardTitle}>Timer</Text>
-                      <Text style={styles.cardSubtitle}>{timerSeconds} minutes</Text>
+                    <View style={[styles.glassCard, styles.smallCard, isPad && { padding: 32, paddingTop: 24 }]}>
+                      <Text style={[styles.cardTitle, isPad && { fontSize: 24 }]}>Timer</Text>
+                      <Text style={[styles.cardSubtitle, isPad && { fontSize: 20 }]}>{timerSeconds} minutes</Text>
                     </View>
                   </View>
                 </View>
